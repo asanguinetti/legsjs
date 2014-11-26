@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <title>Creature Demo - Axel Sanguinetti</title>
+  
+  <script type="text/javascript" src="/js/three.js"></script>
+  <script type="text/javascript" src="/js/cannon.js"></script>
+  
+  <script type="text/javascript">
+  
+  'use strict';
+  
+  // Function declarations
+  var shape2mesh;
+  var addVisual;
+  var buildTrunk;
+  var initScene;
+  var updatePhysics;
+  var updateVisuals;
+  var updateMuscleVisual;
+  var animate;
+
+  // Internal objects
+  var scene;
+
+  shape2mesh = function(body){
+    var obj = new THREE.Object3D();
+
+    var color = 0xdddddd;
+    if ( body.material && body.material.color !== undefined )
+      color = body.material.color;
+
+    // Material
+    var material = new THREE.MeshLambertMaterial( { color: color } );
+
+    for (var l = 0; l < body.shapes.length; l++) {
+      var shape = body.shapes[l];
+      var mesh;
+
+      switch(shape.type) {
+
+        case CANNON.Shape.types.SPHERE:
+          var sphere_geometry = new THREE.SphereGeometry( shape.radius, 8, 8);
+          mesh = new THREE.Mesh( sphere_geometry, material );
+          break;
+
+        case CANNON.Shape.types.BOX:
+          var box_geometry = new THREE.BoxGeometry(  shape.halfExtents.x*2,
+                                                      shape.halfExtents.y*2,
+                                                      shape.halfExtents.z*2 );
+          mesh = new THREE.Mesh( box_geometry, material );
+          break;
+
+        default:
+          throw "Visual type not recognized: "+shape.type;
+      }
+
+      mesh.receiveShadow = true;
+      mesh.castShadow = true;
+
+      var o = body.shapeOffsets[l];
+      var q = body.shapeOrientations[l];
+      mesh.position.set(o.x, o.y, o.z);
+      mesh.quaternion.set(q.x, q.y, q.z, q.w);
+
+      obj.add(mesh);
+    }
+
+    return obj;
+  };
+
+  addVisual = function(scene, body){
+    var mesh = shape2mesh(body);
+    if( mesh ) {
+      body.visualref = mesh;
+      scene.add(mesh);
+    }
+  };
+
+  updateMuscleVisual = function(muscle) {
+    var x = muscle.bodyA.position.vadd(muscle.bodyA.quaternion.vmult(muscle.localAnchorA));
+    var y = muscle.bodyB.position.vadd(muscle.bodyB.quaternion.vmult(muscle.localAnchorB));
+    var p = x.vadd(y).scale(0.5);
+    var dir = x.vsub(y).unit();
+    var q = new CANNON.Quaternion();
+    muscle.visualref.scale.y = muscle.restLength;
+    q.setFromVectors(new CANNON.Vec3(0, 1, 0), dir);
+    muscle.visualref.position.set(p.x, p.y, p.z);
+    muscle.visualref.quaternion.set(q.x, q.y, q.z, q.w);
+  }
+
+  buildTrunk = function(mass, material, pos, dimensions) {
+    var trunk = new CANNON.Body({ mass: mass, material: material });
+    trunk.position.copy(pos);
+    var dir = dimensions.clone();
+    dir.z *= -1;
+    dir.y = 0;
+    var shoulderLength = 0.5 * dir.norm();
+    var backboneShape = new CANNON.Box(new CANNON.Vec3(0.2, dimensions.y, 0.2));
+    var shoulderShape = new CANNON.Box(new CANNON.Vec3(0.2, shoulderLength, 0.2));
+    trunk.addShape(backboneShape);
+
+    var q = new CANNON.Quaternion();
+    q.setFromVectors(new CANNON.Vec3(0, 1, 0), dir);
+    trunk.addShape(shoulderShape, dir.scale(0.5).vadd(new CANNON.Vec3(0,dimensions.y,0)), q);
+    dir.x *= -1; 
+    q.setFromVectors(new CANNON.Vec3(0, 1, 0), dir);
+    trunk.addShape(shoulderShape, dir.scale(0.5).vadd(new CANNON.Vec3(0,dimensions.y,0)), q);
+    dir.x *= -1;
+    q.setFromVectors(new CANNON.Vec3(0, 1, 0), dir);
+    trunk.addShape(shoulderShape, dir.scale(0.5).vadd(new CANNON.Vec3(0,-dimensions.y,0)), q);
+    dir.x *= -1;
+    q.setFromVectors(new CANNON.Vec3(0, 1, 0), dir);
+    trunk.addShape(shoulderShape, dir.scale(0.5).vadd(new CANNON.Vec3(0,-dimensions.y,0)), q);
+
+    return trunk;
+  }
+  
+  initScene = function() {
+    scene = new THREE.Scene();
+
+    scene.renderer = new THREE.WebGLRenderer({ antialias: true });
+    scene.renderer.setClearColor( 0x000000, 1);
+    scene.renderer.setSize( window.innerWidth, window.innerHeight );
+    scene.renderer.shadowMapEnabled = true;
+    scene.renderer.shadowMapSoft = true;
+    document.getElementById( 'viewport' ).appendChild( scene.renderer.domElement );
+    
+    scene.camera = new THREE.PerspectiveCamera(
+      35,
+      window.innerWidth / window.innerHeight,
+      1,
+      1000
+    );
+    scene.camera.position.set( 60, 60, 50 );
+    scene.camera.up.set(0,0,1);
+    scene.camera.lookAt( scene.position );
+    scene.add( scene.camera );
+    
+    // Light
+    var light = new THREE.DirectionalLight( 0xFFFFFF );
+    light.position.set( -15, 20, 40 );
+    light.target.position.copy( scene.position );
+    light.castShadow = true;
+    light.shadowCameraLeft = -60;
+    light.shadowCameraTop = -60;
+    light.shadowCameraRight = 60;
+    light.shadowCameraBottom = 60;
+    light.shadowCameraNear = 20;
+    light.shadowCameraFar = 200;
+    light.shadowBias = -.0001
+    light.shadowMapWidth = light.shadowMapHeight = 2048;
+    light.shadowDarkness = .7;
+    scene.add( light );
+
+    scene.world = new CANNON.World();
+    scene.world.gravity.set(0,0,-20);
+    
+    // Materials
+    var groundMaterial = new CANNON.Material("groundMaterial");
+    groundMaterial.color = 0x888888;
+    var boneMaterial = new CANNON.Material("boneMaterial");
+    boneMaterial.color = 0x444444;
+    var bodyMaterial = new CANNON.Material("bodyMaterial");
+    bodyMaterial.color = 0xff6666;
+    var legGroundContactMaterial = new CANNON.ContactMaterial(groundMaterial,
+                                                              boneMaterial, 
+                                                              { friction: 0.5, restitution: 0.3 });
+    scene.world.addContactMaterial(legGroundContactMaterial);
+    
+    // Ground
+    var groundShape = new CANNON.Box(new CANNON.Vec3(50, 50, 0.5));
+    var ground = new CANNON.Body({ mass: 0, material: groundMaterial });
+    ground.addShape(groundShape);
+    
+    // Body
+    var mass = 2;
+    var bodyDimensions = new CANNON.Vec3(3.5, 5, 2.5);
+    var bodyShape = new CANNON.Box(bodyDimensions);
+    var body = new CANNON.Body({ mass: mass, material: bodyMaterial });
+    body.addShape(bodyShape);
+    body.position.z = 12;
+
+    var trunk = buildTrunk(mass, boneMaterial, body.position, bodyDimensions);
+
+    var legDimensions = new CANNON.Vec3(0.2, 0.2, 2.0);
+    var legUpperShape = new CANNON.Box(legDimensions.scale(0.9));
+    var legLowerShape = new CANNON.Box(legDimensions.scale(0.9));
+    var legEndShape = new CANNON.Sphere(2*legDimensions.x);
+
+    var legFL = {};
+    var legFR = {};
+    var legRL = {};
+    var legRR = {};
+
+    legFL.upper = new CANNON.Body({ mass: mass, material: boneMaterial });
+    legFL.upper.addShape(legUpperShape);
+    legFL.upper.position.set( bodyDimensions.x,
+                              bodyDimensions.y,
+                              trunk.position.z - bodyDimensions.z - legDimensions.z );
+    legFR.upper = new CANNON.Body({ mass: mass, material: boneMaterial });
+    legFR.upper.addShape(legUpperShape);
+    legFR.upper.position.set( -bodyDimensions.x,
+                              bodyDimensions.y,
+                              trunk.position.z - bodyDimensions.z - legDimensions.z );
+    legFR.upper.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+    legRL.upper = new CANNON.Body({ mass: mass, material: boneMaterial });
+    legRL.upper.addShape(legUpperShape);
+    legRL.upper.position.set( bodyDimensions.x,
+                              -bodyDimensions.y,
+                              trunk.position.z - bodyDimensions.z - legDimensions.z );
+    legRR.upper = new CANNON.Body({ mass: mass, material: boneMaterial });
+    legRR.upper.addShape(legUpperShape);
+    legRR.upper.position.set( -bodyDimensions.x,
+                              -bodyDimensions.y,
+                              trunk.position.z - bodyDimensions.z - legDimensions.z );
+    legRR.upper.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 8);
+
+    legFL.lower = new CANNON.Body({ mass: mass, material: boneMaterial });
+    legFL.lower.addShape(legUpperShape);
+    legFL.lower.addShape(legEndShape, new CANNON.Vec3(0,0,-legDimensions.z));
+    legFL.lower.position.set( bodyDimensions.x,
+                              bodyDimensions.y,
+                              trunk.position.z - bodyDimensions.z - 3 * legDimensions.z );
+    legFL.lower.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 8);
+    legFR.lower = new CANNON.Body({ mass: mass, material: boneMaterial });
+    legFR.lower.addShape(legUpperShape);
+    legFR.lower.addShape(legEndShape, new CANNON.Vec3(0,0,-legDimensions.z));
+    legFR.lower.position.set( -bodyDimensions.x,
+                              bodyDimensions.y,
+                              trunk.position.z - bodyDimensions.z - 3 * legDimensions.z );
+    legFR.lower.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+    legRL.lower = new CANNON.Body({ mass: mass, material: boneMaterial });
+    legRL.lower.addShape(legUpperShape);
+    legRL.lower.addShape(legEndShape, new CANNON.Vec3(0,0,-legDimensions.z));
+    legRL.lower.position.set( bodyDimensions.x,
+                              -bodyDimensions.y,
+                              trunk.position.z - bodyDimensions.z - 3 * legDimensions.z );
+    legRL.lower.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+    legRR.lower = new CANNON.Body({ mass: mass, material: boneMaterial });
+    legRR.lower.addShape(legUpperShape);
+    legRR.lower.addShape(legEndShape, new CANNON.Vec3(0,0,-legDimensions.z));
+    legRR.lower.position.set( -bodyDimensions.x,
+                              -bodyDimensions.y,
+                              trunk.position.z - bodyDimensions.z - 3 * legDimensions.z );
+    legRR.lower.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+
+    // Add springs to simulate muscles
+    var springUpperParams = {
+        localAnchorA: new CANNON.Vec3(0,0,-0.5),
+        localAnchorB: new CANNON.Vec3(0,-legDimensions.y,-0.5),
+        damping: 10,
+        stiffness: 2500.0,
+        restLength: 7
+    };
+    var springLowerFrontParams = {
+        localAnchorA: new CANNON.Vec3(0,legDimensions.y,0),
+        localAnchorB: new CANNON.Vec3(0,legDimensions.y,0),
+        damping: 10,
+        stiffness: 2500.0,
+        restLength: 1.7 * legDimensions.z
+    };
+    var springLowerRearParams = {
+        localAnchorA: new CANNON.Vec3(0,-legDimensions.y,0),
+        localAnchorB: new CANNON.Vec3(0,-legDimensions.y,0),
+        damping: 10,
+        stiffness: 2500.0,
+        restLength: 1.7 * legDimensions.z
+    };
+
+    var muscles = [];
+    var legUpperFLSpring = new CANNON.Spring( trunk, legFL.upper, springUpperParams );
+    muscles.push(legUpperFLSpring);
+    var legUpperFRSpring = new CANNON.Spring( trunk, legFR.upper, springUpperParams );
+    muscles.push(legUpperFRSpring);
+    var legUpperRLSpring = new CANNON.Spring( trunk, legRL.upper, springUpperParams );
+    muscles.push(legUpperRLSpring);
+    var legUpperRRSpring = new CANNON.Spring( trunk, legRR.upper, springUpperParams );
+    muscles.push(legUpperRRSpring);
+    var legLowerFLSpring = new CANNON.Spring( legFL.upper, legFL.lower, springLowerFrontParams );
+    muscles.push(legLowerFLSpring);
+    var legLowerFRSpring = new CANNON.Spring( legFR.upper, legFR.lower, springLowerFrontParams );
+    muscles.push(legLowerFRSpring);
+    var legLowerRLSpring = new CANNON.Spring( legRL.upper, legRL.lower, springLowerRearParams );
+    muscles.push(legLowerRLSpring);
+    var legLowerRRSpring = new CANNON.Spring( legRR.upper, legRR.lower, springLowerRearParams );
+    muscles.push(legLowerRRSpring);
+
+    for( i in muscles )
+    {
+      var muscle = muscles[i];
+      var mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry( 0.2, 0.2, 1.0 ),
+        new THREE.MeshLambertMaterial( { color: 0xff8888 } )
+      );
+      muscle.visualref = mesh;
+      scene.add(mesh);
+      updateMuscleVisual(muscle);
+    }
+
+    scene.world.addEventListener("postStep",function(event){
+        legUpperFLSpring.restLength = 6.5 + 0.4 * Math.sin(this.time+Math.PI/2);
+        legUpperFRSpring.restLength = 6.5 + 0.4 * Math.sin(this.time-Math.PI/2);
+        legUpperRLSpring.restLength = 7 + 0.5 * Math.sin(this.time-Math.PI/2);
+        legUpperRRSpring.restLength = 7 + 0.5 * Math.sin(this.time+Math.PI/2);
+        legLowerFLSpring.restLength = 1.7*legDimensions.z + 0.1 * legDimensions.z * Math.sin(this.time-Math.PI/2);
+        legLowerFRSpring.restLength = 1.7*legDimensions.z + 0.1 * legDimensions.z * Math.sin(this.time+Math.PI/2);
+        legLowerRLSpring.restLength = 1.7*legDimensions.z + 0.15 * legDimensions.z * Math.sin(this.time-Math.PI/2);
+        legLowerRRSpring.restLength = 1.7*legDimensions.z + 0.15 * legDimensions.z * Math.sin(this.time+Math.PI/2);
+
+        for( i in muscles ) {
+          muscles[i]
+          muscles[i].applyForce();
+          updateMuscleVisual(muscles[i]);
+        }
+    });
+
+    // Constrain legs
+    var constraints = [];
+    var leftAxis = new CANNON.Vec3(1,0,0);
+    constraints.push(new CANNON.HingeConstraint(trunk, legFL.upper,  { pivotA: new CANNON.Vec3( bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis,  pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(trunk, legFR.upper, { pivotA: new CANNON.Vec3( -bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(trunk, legRL.upper,   { pivotA: new CANNON.Vec3( bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(trunk, legRR.upper,  { pivotA: new CANNON.Vec3( -bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+
+    constraints.push(new CANNON.HingeConstraint(legFL.upper, legFL.lower,  { pivotA: new CANNON.Vec3( 0, 0, -legDimensions.z ), axisA: leftAxis,  pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(legFR.upper, legFR.lower, { pivotA: new CANNON.Vec3( 0, 0, -legDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(legRL.upper, legRL.lower,   { pivotA: new CANNON.Vec3( 0, 0, -legDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(legRR.upper, legRR.lower,  { pivotA: new CANNON.Vec3( 0, 0, -legDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+
+    for(var i=0; i<constraints.length; i++)
+      scene.world.addConstraint(constraints[i]);
+
+    scene.world.add(ground);
+    addVisual(scene, ground);
+
+    // scene.world.add(body);
+    // addVisual(scene, body);
+
+    var bones = [trunk, 
+                 legFL.upper,legFR.upper,legRL.upper,legRR.upper,
+                 legFL.lower,legFR.lower,legRL.lower,legRR.lower];
+    for(var i=0; i<bones.length; i++){
+      scene.world.add(bones[i]);
+      addVisual(scene, bones[i]);
+    }
+
+    animate();
+  };
+
+  var lastCallTime = 0;
+  updatePhysics = function() {
+      // Step world
+      var timeStep = 1 / 60;
+      var now = Date.now() / 1000;
+
+      if(!lastCallTime){
+        // last call time not saved, cant guess elapsed time. Take a simple step.
+        scene.world.step(timeStep);
+        lastCallTime = now;
+        return;
+      }
+
+      var timeSinceLastCall = now - lastCallTime;
+
+      scene.world.step(timeStep, timeSinceLastCall, 3);
+
+      lastCallTime = now;
+  }
+
+  updateVisuals = function() {
+    // Read position data into visuals
+    for( var i=0; i<scene.world.bodies.length; i++ ) {
+      var b = scene.world.bodies[i], 
+      visual = b.visualref;
+      visual.position.copy(b.position);
+      if( b.quaternion ) {
+        visual.quaternion.copy(b.quaternion);
+      }
+    }
+  }
+  
+  animate = function() {
+    requestAnimationFrame( animate );
+    updateVisuals();
+    updatePhysics();
+    scene.renderer.clear();
+    scene.renderer.render( scene, scene.camera );
+  }
+
+  window.onload = initScene;
+  
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+</body>
+
+</html>

@@ -1,0 +1,1 @@
+Demo of a quadruped creature's walking motion with simulated physics.
