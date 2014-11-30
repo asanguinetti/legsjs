@@ -20,6 +20,8 @@
   var updatePhysics;
   var updateVisuals;
   var updateMuscleVisual;
+  var createFrontLeg
+  var createBackLeg;
   var animate;
 
   // Internal objects
@@ -117,6 +119,90 @@
 
     return trunk;
   }
+
+  createFrontLeg = function(jointPos, mass, material) {
+    var leg = {};
+
+    leg.upper = new CANNON.Body({mass: mass, material: material});
+    leg.upper.size = new CANNON.Vec3(0.2, 0.2, 2.0);
+    leg.upper.addShape(new CANNON.Box(leg.upper.size.scale(0.9)));
+    leg.upper.position.copy(jointPos);
+    leg.upper.position.z -= leg.upper.size.z;
+
+    leg.middle = new CANNON.Body({mass: mass, material: material});
+    leg.middle.size = new CANNON.Vec3(0.2, 0.2, 2.0);
+    leg.middle.addShape(new CANNON.Box(leg.middle.size.scale(0.9)));
+    leg.middle.addShape(new CANNON.Sphere(2*leg.middle.size.x), 
+                       new CANNON.Vec3(0,0,-leg.middle.size.z));
+    leg.middle.position.z -= leg.middle.size.z;
+    leg.middle.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 8);
+    leg.middle.position.copy(leg.upper.position);
+    leg.middle.position.z -= leg.upper.size.z + leg.middle.size.z;
+
+    var upperMiddleSpringParams = {
+        localAnchorA: new CANNON.Vec3(0,leg.upper.size.y,0),
+        localAnchorB: new CANNON.Vec3(0,leg.middle.size.y,0),
+        damping: 10,
+        stiffness: 2500.0,
+        restLength: 0.85 * (leg.upper.size.z + leg.middle.size.z)
+    };
+
+    leg.upperMiddleMuscle = new CANNON.Spring( leg.upper, 
+                                              leg.middle, 
+                                              upperMiddleSpringParams );
+    leg.upperMiddleMuscle.midLength = leg.upperMiddleMuscle.restLength;
+
+    leg.muscles = [];
+    leg.muscles.push(leg.upperMiddleMuscle);
+
+    var leftAxis = new CANNON.Vec3(1,0,0);
+    leg.constraints = [];
+    leg.constraints.push(new CANNON.HingeConstraint(leg.upper, leg.middle, { pivotA: new CANNON.Vec3( 0, 0, -leg.upper.size.z ), axisA: leftAxis,  pivotB: new CANNON.Vec3( 0, 0, leg.middle.size.z ), axisB: leftAxis }));
+
+    return leg;
+  }
+
+  createBackLeg = function(jointPos, mass, material) {
+    var leg = {};
+
+    leg.upper = new CANNON.Body({mass: mass, material: material});
+    leg.upper.size = new CANNON.Vec3(0.2, 0.2, 2.0);
+    leg.upper.addShape(new CANNON.Box(leg.upper.size.scale(0.9)));
+    leg.upper.position.copy(jointPos);
+    leg.upper.position.z -= leg.upper.size.z;
+
+    leg.middle = new CANNON.Body({mass: mass, material: material});
+    leg.middle.size = new CANNON.Vec3(0.2, 0.2, 2.0);
+    leg.middle.addShape(new CANNON.Box(leg.middle.size.scale(0.9)));
+    leg.middle.addShape(new CANNON.Sphere(2*leg.middle.size.x), 
+                       new CANNON.Vec3(0,0,-leg.middle.size.z));
+    leg.middle.position.z -= leg.middle.size.z;
+    leg.middle.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+    leg.middle.position.copy(leg.upper.position);
+    leg.middle.position.z -= leg.upper.size.z + leg.middle.size.z;
+
+    var upperMiddleSpringParams = {
+        localAnchorA: new CANNON.Vec3(0,-leg.upper.size.y,0),
+        localAnchorB: new CANNON.Vec3(0,-leg.middle.size.y,0),
+        damping: 10,
+        stiffness: 2500.0,
+        restLength: 0.85 * (leg.upper.size.z + leg.middle.size.z)
+    };
+
+    leg.upperMiddleMuscle = new CANNON.Spring( leg.upper, 
+                                              leg.middle, 
+                                              upperMiddleSpringParams );
+    leg.upperMiddleMuscle.midLength = leg.upperMiddleMuscle.restLength;
+
+    leg.muscles = [];
+    leg.muscles.push(leg.upperMiddleMuscle);
+
+    var leftAxis = new CANNON.Vec3(1,0,0);
+    leg.constraints = [];
+    leg.constraints.push(new CANNON.HingeConstraint(leg.upper, leg.middle, { pivotA: new CANNON.Vec3( 0, 0, -leg.upper.size.z ), axisA: leftAxis,  pivotB: new CANNON.Vec3( 0, 0, leg.middle.size.z ), axisB: leftAxis }));
+
+    return leg;
+  }
   
   initScene = function() {
     scene = new THREE.Scene();
@@ -185,89 +271,35 @@
 
     var trunk = buildTrunk(mass, boneMaterial, body.position, bodyDimensions);
 
-    var legDimensions = new CANNON.Vec3(0.2, 0.2, 2.0);
-    var legUpperShape = new CANNON.Box(legDimensions.scale(0.9));
-    var legLowerShape = new CANNON.Box(legDimensions.scale(0.9));
-    var legEndShape = new CANNON.Sphere(2*legDimensions.x);
-
-    var legFL = {};
-    var legFR = {};
-    var legRL = {};
-    var legRR = {};
-
-    legFL.upper = new CANNON.Body({ mass: mass, material: boneMaterial });
-    legFL.upper.addShape(legUpperShape);
-    legFL.upper.position.set( bodyDimensions.x,
-                              bodyDimensions.y,
-                              trunk.position.z - bodyDimensions.z - legDimensions.z );
-    legFR.upper = new CANNON.Body({ mass: mass, material: boneMaterial });
-    legFR.upper.addShape(legUpperShape);
-    legFR.upper.position.set( -bodyDimensions.x,
-                              bodyDimensions.y,
-                              trunk.position.z - bodyDimensions.z - legDimensions.z );
+    var legFL = createFrontLeg(new CANNON.Vec3(bodyDimensions.x, 
+                                               bodyDimensions.y,
+                                               trunk.position.z - bodyDimensions.z),
+                                               mass, boneMaterial);
+    var legFR = createFrontLeg(new CANNON.Vec3(-bodyDimensions.x, 
+                                               bodyDimensions.y,
+                                               trunk.position.z - bodyDimensions.z),
+                                               mass, boneMaterial);
     legFR.upper.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
-    legRL.upper = new CANNON.Body({ mass: mass, material: boneMaterial });
-    legRL.upper.addShape(legUpperShape);
-    legRL.upper.position.set( bodyDimensions.x,
-                              -bodyDimensions.y,
-                              trunk.position.z - bodyDimensions.z - legDimensions.z );
-    legRR.upper = new CANNON.Body({ mass: mass, material: boneMaterial });
-    legRR.upper.addShape(legUpperShape);
-    legRR.upper.position.set( -bodyDimensions.x,
-                              -bodyDimensions.y,
-                              trunk.position.z - bodyDimensions.z - legDimensions.z );
+    legFR.middle.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+    var legRL = createBackLeg(new CANNON.Vec3(bodyDimensions.x, 
+                                              -bodyDimensions.y,
+                                              trunk.position.z - bodyDimensions.z),
+                                              mass, boneMaterial);
+    var legRR = createBackLeg(new CANNON.Vec3(-bodyDimensions.x, 
+                                              -bodyDimensions.y,
+                                              trunk.position.z - bodyDimensions.z),
+                                              mass, boneMaterial);
     legRR.upper.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 8);
 
-    legFL.lower = new CANNON.Body({ mass: mass, material: boneMaterial });
-    legFL.lower.addShape(legUpperShape);
-    legFL.lower.addShape(legEndShape, new CANNON.Vec3(0,0,-legDimensions.z));
-    legFL.lower.position.set( bodyDimensions.x,
-                              bodyDimensions.y,
-                              trunk.position.z - bodyDimensions.z - 3 * legDimensions.z );
-    legFL.lower.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 8);
-    legFR.lower = new CANNON.Body({ mass: mass, material: boneMaterial });
-    legFR.lower.addShape(legUpperShape);
-    legFR.lower.addShape(legEndShape, new CANNON.Vec3(0,0,-legDimensions.z));
-    legFR.lower.position.set( -bodyDimensions.x,
-                              bodyDimensions.y,
-                              trunk.position.z - bodyDimensions.z - 3 * legDimensions.z );
-    legFR.lower.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
-    legRL.lower = new CANNON.Body({ mass: mass, material: boneMaterial });
-    legRL.lower.addShape(legUpperShape);
-    legRL.lower.addShape(legEndShape, new CANNON.Vec3(0,0,-legDimensions.z));
-    legRL.lower.position.set( bodyDimensions.x,
-                              -bodyDimensions.y,
-                              trunk.position.z - bodyDimensions.z - 3 * legDimensions.z );
-    legRL.lower.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
-    legRR.lower = new CANNON.Body({ mass: mass, material: boneMaterial });
-    legRR.lower.addShape(legUpperShape);
-    legRR.lower.addShape(legEndShape, new CANNON.Vec3(0,0,-legDimensions.z));
-    legRR.lower.position.set( -bodyDimensions.x,
-                              -bodyDimensions.y,
-                              trunk.position.z - bodyDimensions.z - 3 * legDimensions.z );
-    legRR.lower.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+    var legs = [legFL, legFR, legRL, legRR];
 
     // Add springs to simulate muscles
     var springUpperParams = {
         localAnchorA: new CANNON.Vec3(0,0,-0.5),
-        localAnchorB: new CANNON.Vec3(0,-legDimensions.y,-0.5),
+        localAnchorB: new CANNON.Vec3(0,-legFL.upper.size.y,-0.5),
         damping: 10,
         stiffness: 2500.0,
         restLength: 7
-    };
-    var springLowerFrontParams = {
-        localAnchorA: new CANNON.Vec3(0,legDimensions.y,0),
-        localAnchorB: new CANNON.Vec3(0,legDimensions.y,0),
-        damping: 10,
-        stiffness: 2500.0,
-        restLength: 1.7 * legDimensions.z
-    };
-    var springLowerRearParams = {
-        localAnchorA: new CANNON.Vec3(0,-legDimensions.y,0),
-        localAnchorB: new CANNON.Vec3(0,-legDimensions.y,0),
-        damping: 10,
-        stiffness: 2500.0,
-        restLength: 1.7 * legDimensions.z
     };
 
     var muscles = [];
@@ -279,16 +311,11 @@
     muscles.push(legUpperRLSpring);
     var legUpperRRSpring = new CANNON.Spring( trunk, legRR.upper, springUpperParams );
     muscles.push(legUpperRRSpring);
-    var legLowerFLSpring = new CANNON.Spring( legFL.upper, legFL.lower, springLowerFrontParams );
-    muscles.push(legLowerFLSpring);
-    var legLowerFRSpring = new CANNON.Spring( legFR.upper, legFR.lower, springLowerFrontParams );
-    muscles.push(legLowerFRSpring);
-    var legLowerRLSpring = new CANNON.Spring( legRL.upper, legRL.lower, springLowerRearParams );
-    muscles.push(legLowerRLSpring);
-    var legLowerRRSpring = new CANNON.Spring( legRR.upper, legRR.lower, springLowerRearParams );
-    muscles.push(legLowerRRSpring);
 
-    for( i in muscles )
+    for( var i = 0; i < legs.length; i++ )
+      muscles = muscles.concat(legs[i].muscles);
+
+    for( var i = 0; i < muscles.length; i++ )
     {
       var muscle = muscles[i];
       var mesh = new THREE.Mesh(
@@ -305,10 +332,10 @@
         legUpperFRSpring.restLength = 6.5 + 0.4 * Math.sin(this.time-Math.PI/2);
         legUpperRLSpring.restLength = 7 + 0.5 * Math.sin(this.time-Math.PI/2);
         legUpperRRSpring.restLength = 7 + 0.5 * Math.sin(this.time+Math.PI/2);
-        legLowerFLSpring.restLength = 1.7*legDimensions.z + 0.1 * legDimensions.z * Math.sin(this.time-Math.PI/2);
-        legLowerFRSpring.restLength = 1.7*legDimensions.z + 0.1 * legDimensions.z * Math.sin(this.time+Math.PI/2);
-        legLowerRLSpring.restLength = 1.7*legDimensions.z + 0.15 * legDimensions.z * Math.sin(this.time-Math.PI/2);
-        legLowerRRSpring.restLength = 1.7*legDimensions.z + 0.15 * legDimensions.z * Math.sin(this.time+Math.PI/2);
+        legFL.upperMiddleMuscle.restLength = legFL.upperMiddleMuscle.midLength + 0.1 * legFL.upper.size.z * Math.sin(this.time-Math.PI/2);
+        legFR.upperMiddleMuscle.restLength = legFR.upperMiddleMuscle.midLength + 0.1 * legFR.upper.size.z * Math.sin(this.time+Math.PI/2);
+        legRL.upperMiddleMuscle.restLength = legRL.upperMiddleMuscle.midLength + 0.15 * legRL.upper.size.z * Math.sin(this.time-Math.PI/2);
+        legRR.upperMiddleMuscle.restLength = legRR.upperMiddleMuscle.midLength + 0.15 * legRR.upper.size.z * Math.sin(this.time+Math.PI/2);
 
         for( i in muscles ) {
           muscles[i]
@@ -320,15 +347,13 @@
     // Constrain legs
     var constraints = [];
     var leftAxis = new CANNON.Vec3(1,0,0);
-    constraints.push(new CANNON.HingeConstraint(trunk, legFL.upper,  { pivotA: new CANNON.Vec3( bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis,  pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
-    constraints.push(new CANNON.HingeConstraint(trunk, legFR.upper, { pivotA: new CANNON.Vec3( -bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
-    constraints.push(new CANNON.HingeConstraint(trunk, legRL.upper,   { pivotA: new CANNON.Vec3( bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
-    constraints.push(new CANNON.HingeConstraint(trunk, legRR.upper,  { pivotA: new CANNON.Vec3( -bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(trunk, legFL.upper,  { pivotA: new CANNON.Vec3( bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis,  pivotB: new CANNON.Vec3( 0, 0, legFL.upper.size.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(trunk, legFR.upper, { pivotA: new CANNON.Vec3( -bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legFR.upper.size.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(trunk, legRL.upper,   { pivotA: new CANNON.Vec3( bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legRL.upper.size.z ), axisB: leftAxis }));
+    constraints.push(new CANNON.HingeConstraint(trunk, legRR.upper,  { pivotA: new CANNON.Vec3( -bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legRR.upper.size.z ), axisB: leftAxis }));
 
-    constraints.push(new CANNON.HingeConstraint(legFL.upper, legFL.lower,  { pivotA: new CANNON.Vec3( 0, 0, -legDimensions.z ), axisA: leftAxis,  pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
-    constraints.push(new CANNON.HingeConstraint(legFR.upper, legFR.lower, { pivotA: new CANNON.Vec3( 0, 0, -legDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
-    constraints.push(new CANNON.HingeConstraint(legRL.upper, legRL.lower,   { pivotA: new CANNON.Vec3( 0, 0, -legDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
-    constraints.push(new CANNON.HingeConstraint(legRR.upper, legRR.lower,  { pivotA: new CANNON.Vec3( 0, 0, -legDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legDimensions.z ), axisB: leftAxis }));
+    for( var i = 0; i < legs.length; i++ )
+      constraints = constraints.concat(legs[i].constraints);
 
     for(var i=0; i<constraints.length; i++)
       scene.world.addConstraint(constraints[i]);
@@ -341,7 +366,7 @@
 
     var bones = [trunk, 
                  legFL.upper,legFR.upper,legRL.upper,legRR.upper,
-                 legFL.lower,legFR.lower,legRL.lower,legRR.lower];
+                 legFL.middle,legFR.middle,legRL.middle,legRR.middle];
     for(var i=0; i<bones.length; i++){
       scene.world.add(bones[i]);
       addVisual(scene, bones[i]);
