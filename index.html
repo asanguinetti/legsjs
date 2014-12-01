@@ -24,6 +24,10 @@
   var createBackLeg;
   var animate;
   var respectJoints;
+  var onTouchStart;
+  var onMouseMove;
+  var onMouseWheel;
+  var updateCamera;
 
   // Internal objects
   var scene;
@@ -275,7 +279,12 @@
     scene.renderer.shadowMapEnabled = true;
     scene.renderer.shadowMapSoft = true;
     document.getElementById( 'viewport' ).appendChild( scene.renderer.domElement );
-    
+    scene.renderer.domElement.addEventListener('touchstart', onTouchStart);
+    scene.renderer.domElement.addEventListener('touchmove', onMouseMove);
+    scene.renderer.domElement.addEventListener("mousewheel", onMouseWheel, false);
+    scene.renderer.domElement.addEventListener("DOMMouseScroll", onMouseWheel, false);
+    scene.renderer.domElement.addEventListener('mousemove', onMouseMove);
+
     scene.camera = new THREE.PerspectiveCamera(
       35,
       window.innerWidth / window.innerHeight,
@@ -443,6 +452,107 @@
     animate();
   };
 
+  var pinchDist = 0;
+  onTouchStart = function(event) {
+    if (typeof event == 'undefined')
+      event = window.event;
+    
+    if (event.touches){
+      if(event.touches.length == 2) {
+        pinchDist = vec2.distance([event.touches[0].pageX, 
+                                   event.touches[0].pageY], 
+                                  [event.touches[1].pageX, 
+                                   event.touches[1].pageY]);
+        event.preventDefault();
+      }
+    }
+  }
+
+  var inclination = Math.PI/4;
+  var azimuth = 0;
+  var yaw = 0;
+  var pitch = 0;
+  onMouseMove = function(event) {
+    var x;
+    var y;
+
+    if (typeof event == 'undefined')
+      event = window.event;
+    
+    event.preventDefault();
+
+    if ( event.changedTouches ) {
+      if(event.touches.length == 2) {
+        /* it's a pinch to zoom gesture */
+        newDist = vec2.distance([event.touches[0].pageX, 
+                                 event.touches[0].pageY], 
+                                [event.touches[1].pageX, 
+                                 event.touches[1].pageY]);
+        zoom += (pinchDist - newDist);
+        pinchDist = newDist;
+        zoom = Math.max(0, Math.min(zoom, 80));
+        return;
+      }
+      event = event.changedTouches[0];
+    }
+      
+    if(event.clientX) {
+        x = event.clientX+document.body.scrollLeft;
+        y = event.clientY+document.body.scrollTop;
+    } else if(event.pageX) {
+        x = event.pageX+window.pageXOffset;
+        y = event.pageY+window.pageYOffset;
+    }
+
+    /* azimuth goes from -PI to PI as the cursor's X goes from left to right */
+    azimuth = x * 2 * Math.PI / window.innerWidth - Math.PI;
+
+    /* inclination goes from PI/2 to 0 as the cursor's Y goes from top to bottom"*/
+    inclination = (window.innerHeight - y) * Math.PI / (2*window.innerHeight);
+
+    /* azimuth will work for yaw since it goes from -PI to PI */
+    yaw = azimuth;
+
+    /* we need pitch to go from PI/2 to -PI/2 as Y goes from top to bottom */
+    pitch = (window.innerHeight - y) * Math.PI / (window.innerHeight) - Math.PI/2;
+  }
+
+
+  var zoom = 50;
+  onMouseWheel = function(event) {
+    /* cross-browser wheel delta */
+    var event = window.event || event; /* IE */
+    delta = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)));
+    zoom += delta;
+    zoom = Math.max(0, Math.min(zoom, 80));
+  }
+
+  var cameraPosMat = new THREE.Matrix4();
+  var m1 = new THREE.Matrix4();
+  var m2 = new THREE.Matrix4();
+  var m3 = new THREE.Matrix4();
+  updateCamera = function()
+  {
+    /* start with the camera at the origin */
+    scene.camera.position.copy( scene.position );
+
+    /* rotates the camera position around the Z axis for the azimuth */
+    m1.makeRotationZ(azimuth);
+
+    /* raises the camera rotating around the X axis for the inclination */
+    m2.makeRotationX(-inclination);
+
+    /* moves the camera away from the center */
+    m3.makeTranslation(0, -zoom, 0);
+
+    cameraPosMat.multiplyMatrices( m1, m2 );
+    cameraPosMat.multiply( m3 );
+
+    /* applies the transformation to the camera position */
+    scene.camera.position.applyMatrix4(cameraPosMat);
+    scene.camera.lookAt( scene.position );
+  }
+
   var lastCallTime = 0;
   updatePhysics = function() {
       // Step world
@@ -477,6 +587,7 @@
   
   animate = function() {
     requestAnimationFrame( animate );
+    updateCamera();
     updateVisuals();
     updatePhysics();
     scene.renderer.clear();
