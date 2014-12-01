@@ -522,7 +522,7 @@
   onMouseWheel = function(event) {
     /* cross-browser wheel delta */
     var event = window.event || event; /* IE */
-    delta = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)));
+    var delta = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)));
     zoom += delta;
     zoom = Math.max(0, Math.min(zoom, 80));
   }
