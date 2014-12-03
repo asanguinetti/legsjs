@@ -2058,14 +2058,16 @@ function DistanceConstraint(bodyA,bodyB,distance,maxForce){
     normal.minForce = -maxForce;
     normal.maxForce =  maxForce;
 
+    this.distance = distance;
+
     // Update
     this.update = function(){
         bodyB.position.vsub(bodyA.position,normal.ni);
         normal.ni.normalize();
         /*bodyA.quaternion.vmult(pivotA,normal.ri);
         bodyB.quaternion.vmult(pivotB,normal.rj);*/
-        normal.ni.mult( distance*0.5,normal.ri);
-        normal.ni.mult( -distance*0.5,normal.rj);
+        normal.ni.mult( this.distance*0.5,normal.ri);
+        normal.ni.mult( -this.distance*0.5,normal.rj);
     };
 }
 DistanceConstraint.prototype = new Constraint();
