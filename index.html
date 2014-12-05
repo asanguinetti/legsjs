@@ -20,6 +20,7 @@
   var updatePhysics;
   var updateVisuals;
   var updateMuscleVisual;
+  var updateMuscleLength;
   var createFrontLeg
   var createBackLeg;
   var animate;
@@ -94,6 +95,14 @@
     q.setFromVectors(new CANNON.Vec3(0, 1, 0), dir);
     muscle.visualref.position.set(p.x, p.y, p.z);
     muscle.visualref.quaternion.set(q.x, q.y, q.z, q.w);
+
+    /* computes the color of the muscle */
+    var r = (muscle.distance - muscle.midLength) / muscle.delta;
+    muscle.visualref.material.color = new THREE.Color( 1, 0.5 - 0.2*r, 0.5 - 0.2*r );
+  }
+
+  updateMuscleLength = function(muscle, wt) {
+    muscle.distance = muscle.midLength + muscle.delta * Math.sin(wt + muscle.phase);
   }
 
   buildTrunk = function(mass, material, pos, dimensions) {
@@ -328,17 +337,39 @@
                                          -bodyDimensions.y,
                                          trunk.position.z - bodyDimensions.z));
 
+    legFL.upperMiddleMuscle.phase = -Math.PI/2;
+    legFR.upperMiddleMuscle.phase = Math.PI/2;
+    legRL.upperMiddleMuscle.phase = -Math.PI/2-Math.PI/4-Math.PI/8;
+    legRR.upperMiddleMuscle.phase = Math.PI/2-Math.PI/4-Math.PI/8;
+
+    legFL.middleLowerMuscle.phase = -Math.PI/2;
+    legFR.middleLowerMuscle.phase = Math.PI/2;
+    legRL.middleLowerMuscle.phase = -Math.PI/2-Math.PI/4-Math.PI/8;
+    legRR.middleLowerMuscle.phase = Math.PI/2-Math.PI/4-Math.PI/8;
+
     var legs = [legFL, legFR, legRL, legRR];
 
     var muscles = [];
-    var legUpperFLSpring = new CANNON.DistanceConstraint( trunk, legFL.upper, 8 );
-    muscles.push(legUpperFLSpring);
-    var legUpperFRSpring = new CANNON.DistanceConstraint( trunk, legFR.upper, 8 );
-    muscles.push(legUpperFRSpring);
-    var legUpperRLSpring = new CANNON.DistanceConstraint( trunk, legRL.upper, 6 );
-    muscles.push(legUpperRLSpring);
-    var legUpperRRSpring = new CANNON.DistanceConstraint( trunk, legRR.upper, 6 );
-    muscles.push(legUpperRRSpring);
+    var trunkLegFLMuscle = new CANNON.DistanceConstraint( trunk, legFL.upper, 8 );
+    trunkLegFLMuscle.midLength = 7;
+    trunkLegFLMuscle.delta = 0.3;
+    trunkLegFLMuscle.phase = Math.PI/2;
+    muscles.push(trunkLegFLMuscle);
+    var trunkLegFRMuscle = new CANNON.DistanceConstraint( trunk, legFR.upper, 8 );
+    trunkLegFRMuscle.midLength = 7;
+    trunkLegFRMuscle.delta = 0.3;
+    trunkLegFRMuscle.phase = -Math.PI/2;
+    muscles.push(trunkLegFRMuscle);
+    var trunkLegRLMuscle = new CANNON.DistanceConstraint( trunk, legRL.upper, 6 );
+    trunkLegRLMuscle.midLength = 6.75;
+    trunkLegRLMuscle.delta = 0.5;
+    trunkLegRLMuscle.phase = -Math.PI/2+Math.PI/4;
+    muscles.push(trunkLegRLMuscle);
+    var trunkLegRRMuscle = new CANNON.DistanceConstraint( trunk, legRR.upper, 6 );
+    trunkLegRRMuscle.midLength = 6.75;
+    trunkLegRRMuscle.delta = 0.5;
+    trunkLegRRMuscle.phase = Math.PI/2+Math.PI/4;
+    muscles.push(trunkLegRRMuscle);
 
     for( var i = 0; i < legs.length; i++ )
       muscles = muscles.concat(legs[i].muscles);
@@ -357,21 +388,8 @@
 
     var omega = 0.5;
     scene.world.addEventListener("preStep",function(event){
-        legUpperFLSpring.distance = 7 + 0.3 * Math.sin(omega*this.time+Math.PI/2);
-        legUpperFRSpring.distance = 7 + 0.3 * Math.sin(omega*this.time-Math.PI/2);
-        legUpperRLSpring.distance = 6.75 + 0.5 * Math.sin(omega*this.time-Math.PI/2+Math.PI/4);
-        legUpperRRSpring.distance = 6.75 + 0.5 * Math.sin(omega*this.time+Math.PI/2+Math.PI/4);
-        legFL.upperMiddleMuscle.distance = legFL.upperMiddleMuscle.midLength + legFL.upperMiddleMuscle.delta * Math.sin(omega*this.time-Math.PI/2);
-        legFR.upperMiddleMuscle.distance = legFR.upperMiddleMuscle.midLength + legFR.upperMiddleMuscle.delta * Math.sin(omega*this.time+Math.PI/2);
-        legRL.upperMiddleMuscle.distance = legRL.upperMiddleMuscle.midLength + legRL.upperMiddleMuscle.delta * Math.sin(omega*this.time-Math.PI/2-Math.PI/4-Math.PI/8);
-        legRR.upperMiddleMuscle.distance = legRR.upperMiddleMuscle.midLength + legRR.upperMiddleMuscle.delta * Math.sin(omega*this.time+Math.PI/2-Math.PI/4-Math.PI/8);
-
-        legFL.middleLowerMuscle.distance = legFL.middleLowerMuscle.midLength + legFL.middleLowerMuscle.delta * Math.sin(omega*this.time+Math.PI/2);
-        legFR.middleLowerMuscle.distance = legFR.middleLowerMuscle.midLength + legFR.middleLowerMuscle.delta * Math.sin(omega*this.time-Math.PI/2);
-        legRL.middleLowerMuscle.distance = legRL.middleLowerMuscle.midLength + legRL.middleLowerMuscle.delta * Math.sin(omega*this.time-Math.PI/2-Math.PI/4-Math.PI/8);
-        legRR.middleLowerMuscle.distance = legRR.middleLowerMuscle.midLength + legRR.middleLowerMuscle.delta * Math.sin(omega*this.time+Math.PI/2-Math.PI/4-Math.PI/8);
-
         for( i in muscles ) {
+          updateMuscleLength(muscles[i], omega*this.time)
           updateMuscleVisual(muscles[i]);
         }
     });
