@@ -27,6 +27,7 @@
   var respectJoints;
   var onTouchStart;
   var onMouseMove;
+  var onKeyDown;
   var onMouseWheel;
   var updateCamera;
 
@@ -99,6 +100,8 @@
     /* computes the color of the muscle */
     var r = (muscle.distance - muscle.midLength) / muscle.delta;
     muscle.visualref.material.color = new THREE.Color( 1, 0.5 - 0.2*r, 0.5 - 0.2*r );
+
+    muscle.visualref.visible = scene.showMuscles;
   }
 
   updateMuscleLength = function(muscle, wt) {
@@ -249,7 +252,7 @@
     scene = new THREE.Scene();
 
     scene.renderer = new THREE.WebGLRenderer({ antialias: true });
-    scene.renderer.setClearColor( 0x000000, 1);
+    scene.renderer.setClearColor( 0xeeeeff, 1);
     scene.renderer.setSize( window.innerWidth, window.innerHeight );
     scene.renderer.shadowMapEnabled = true;
     scene.renderer.shadowMapSoft = true;
@@ -259,6 +262,15 @@
     scene.renderer.domElement.addEventListener("mousewheel", onMouseWheel, false);
     scene.renderer.domElement.addEventListener("DOMMouseScroll", onMouseWheel, false);
     scene.renderer.domElement.addEventListener('mousemove', onMouseMove);
+    window.addEventListener("keydown", onKeyDown);
+
+    scene.info = document.createElement( 'div' );
+    scene.info.style.position = 'absolute';
+    scene.info.style.top = '10px';
+    scene.info.style.width = '100%';
+    scene.info.style.textAlign = 'center';
+    scene.info.innerHTML = '<h1>Press \'1\' to toggle muscle rendering</h1>';
+    document.getElementById( 'viewport' ).appendChild( scene.info );
 
     scene.camera = new THREE.PerspectiveCamera(
       35,
@@ -292,9 +304,9 @@
     
     // Materials
     var groundMaterial = new CANNON.Material("groundMaterial");
-    groundMaterial.color = 0x888888;
+    groundMaterial.color = 0xeeeeee;
     var boneMaterial = new CANNON.Material("boneMaterial");
-    boneMaterial.color = 0x444444;
+    boneMaterial.color = 0x66a5ff;
     var bodyMaterial = new CANNON.Material("bodyMaterial");
     bodyMaterial.color = 0xff6666;
     var legGroundContactMaterial = new CANNON.ContactMaterial(groundMaterial,
@@ -374,6 +386,8 @@
     for( var i = 0; i < legs.length; i++ )
       muscles = muscles.concat(legs[i].muscles);
 
+    scene.showMuscles = false;
+
     for( var i = 0; i < muscles.length; i++ )
     {
       var muscle = muscles[i];
@@ -429,6 +443,12 @@
 
     animate();
   };
+
+  onKeyDown = function(event) {
+    if( event.key !== 'undefined' && event.key == '1' ||
+        event.keyCode == 49 )
+      scene.showMuscles = !scene.showMuscles;
+  }
 
   var pinchDist = 0;
   onTouchStart = function(event) {
@@ -494,7 +514,6 @@
     /* we need pitch to go from PI/2 to -PI/2 as Y goes from top to bottom */
     pitch = (window.innerHeight - y) * Math.PI / (window.innerHeight) - Math.PI/2;
   }
-
 
   var zoom = 50;
   onMouseWheel = function(event) {
