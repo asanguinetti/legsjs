@@ -99,7 +99,7 @@
 
     /* computes the color of the muscle */
     var r = (muscle.distance - muscle.midLength) / muscle.delta;
-    muscle.visualref.material.color = new THREE.Color( 1, 0.5 - 0.2*r, 0.5 - 0.2*r );
+    muscle.visualref.material.color = new THREE.Color( 0.5 + 0.5*r, 0.5 - 0.5*r, 0 );
 
     muscle.visualref.visible = scene.showMuscles;
   }
