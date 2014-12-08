@@ -278,7 +278,7 @@
       1,
       1000
     );
-    scene.camera.position.set( 60, 60, 50 );
+    scene.camera.position.set( 30, -60, 50 );
     scene.camera.up.set(0,0,1);
     scene.camera.lookAt( scene.position );
     scene.add( scene.camera );
@@ -538,10 +538,10 @@
     m1.makeRotationZ(azimuth);
 
     /* raises the camera rotating around the X axis for the inclination */
-    m2.makeRotationX(-inclination);
+    m2.makeRotationX(inclination);
 
     /* moves the camera away from the center */
-    m3.makeTranslation(0, -zoom, 0);
+    m3.makeTranslation(0, zoom, 0);
 
     cameraPosMat.multiplyMatrices( m1, m2 );
     cameraPosMat.multiply( m3 );
