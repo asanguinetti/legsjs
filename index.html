@@ -328,6 +328,7 @@
     body.position.z = 10;
 
     var trunk = buildTrunk(mass, boneMaterial, body.position, bodyDimensions);
+    scene.camera.target = trunk;
 
     var legFL = createFrontLeg(mass, boneMaterial);
     respectJoints(legFL, new CANNON.Vec3(bodyDimensions.x, 
@@ -547,7 +548,8 @@
 
     /* applies the transformation to the camera position */
     scene.camera.position.applyMatrix4(cameraPosMat);
-    scene.camera.lookAt( scene.position );
+    scene.camera.position.add(scene.camera.target.position);
+    scene.camera.lookAt(scene.camera.target.position);
   }
 
   updatePhysics = function() {
