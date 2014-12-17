@@ -5,8 +5,9 @@
 <head>
   <title>Creature Demo - Axel Sanguinetti</title>
   
-  <script type="text/javascript" src="js/three.js"></script>
-  <script type="text/javascript" src="js/cannon.js"></script>
+  <script type="text/javascript" src="/js/three.js"></script>
+  <script type="text/javascript" src="/js/cannon.js"></script>
+  <script type="text/javascript" src="/js/ammo.js"></script>
   
   <script type="text/javascript">
   
@@ -15,12 +16,13 @@
   // Function declarations
   var shape2mesh;
   var addVisual;
-  var buildTrunk;
   var initScene;
   var updatePhysics;
   var updateVisuals;
   var updateMuscleVisual;
   var updateMuscleLength;
+  var createGround;
+  var createTrunk;
   var createFrontLeg
   var createBackLeg;
   var animate;
@@ -34,57 +36,17 @@
   // Internal objects
   var scene;
 
-  shape2mesh = function(body){
+  addVisual = function(scene, body, material, geometry){
+    var mesh = new THREE.Mesh( sphere_geometry, material );
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+
     var obj = new THREE.Object3D();
+    obj.add(mesh);
 
-    var color = 0xdddddd;
-    if ( body.material && body.material.color !== undefined )
-      color = body.material.color;
-
-    // Material
-    var material = new THREE.MeshLambertMaterial( { color: color } );
-
-    for (var l = 0; l < body.shapes.length; l++) {
-      var shape = body.shapes[l];
-      var mesh;
-
-      switch(shape.type) {
-
-        case CANNON.Shape.types.SPHERE:
-          var sphere_geometry = new THREE.SphereGeometry( shape.radius, 8, 8);
-          mesh = new THREE.Mesh( sphere_geometry, material );
-          break;
-
-        case CANNON.Shape.types.BOX:
-          var box_geometry = new THREE.BoxGeometry(  shape.halfExtents.x*2,
-                                                      shape.halfExtents.y*2,
-                                                      shape.halfExtents.z*2 );
-          mesh = new THREE.Mesh( box_geometry, material );
-          break;
-
-        default:
-          throw "Visual type not recognized: "+shape.type;
-      }
-
-      mesh.receiveShadow = true;
-      mesh.castShadow = true;
-
-      var o = body.shapeOffsets[l];
-      var q = body.shapeOrientations[l];
-      mesh.position.set(o.x, o.y, o.z);
-      mesh.quaternion.set(q.x, q.y, q.z, q.w);
-
-      obj.add(mesh);
-    }
-
-    return obj;
-  };
-
-  addVisual = function(scene, body){
-    var mesh = shape2mesh(body);
     if( mesh ) {
-      body.visualref = mesh;
-      scene.add(mesh);
+      body.visualref = obj;
+      scene.add(obj);
     }
   };
 
@@ -99,7 +61,7 @@
 
     /* computes the color of the muscle */
     var r = (muscle.distance - muscle.midLength) / muscle.delta;
-    muscle.visualref.material.color = new THREE.Color( 0.5 + 0.5*r, 0.5 - 0.5*r, 0 );
+    muscle.visualref.material.color = new THREE.Color( 1, 0.5 - 0.2*r, 0.5 - 0.2*r );
 
     muscle.visualref.visible = scene.showMuscles;
   }
@@ -108,29 +70,51 @@
     muscle.distance = muscle.midLength + muscle.delta * Math.sin(wt + muscle.phase);
   }
 
-  buildTrunk = function(mass, material, pos, dimensions) {
-    var trunk = new CANNON.Body({ mass: mass, material: material });
-    trunk.position.copy(pos);
-    var dir = dimensions.clone();
-    dir.z *= -1;
-    dir.y = 0;
-    var shoulderLength = 0.5 * dir.norm();
-    var backboneShape = new CANNON.Box(new CANNON.Vec3(0.2, dimensions.y, 0.2));
-    var shoulderShape = new CANNON.Box(new CANNON.Vec3(0.2, shoulderLength, 0.2));
-    trunk.addShape(backboneShape);
+  createGround = function() {
+    var localInertia = new Ammo.btVector3(0, 0, 0);
+    var shape = new Ammo.btBoxShape(new Ammo.btVector3(50, 50, 0.5));
+    var motionState = new Ammo.btDefaultMotionState();
+    var rbInfo = new Ammo.btRigidBodyConstructionInfo(0, motionState, shape, localInertia);
+    return new Ammo.btRigidBody(rbInfo);
+  }
 
-    var q = new CANNON.Quaternion();
-    q.setFromEuler(0, Math.atan2(-dir.z, dir.x), Math.PI/2, "XYZ");
-    trunk.addShape(shoulderShape, dir.scale(0.5).vadd(new CANNON.Vec3(0,dimensions.y,0)), q);
-    dir.x *= -1; 
-    q.setFromEuler(0, Math.atan2(-dir.z, dir.x), Math.PI/2, "XYZ");
-    trunk.addShape(shoulderShape, dir.scale(0.5).vadd(new CANNON.Vec3(0,dimensions.y,0)), q);
-    dir.x *= -1;
-    q.setFromEuler(0, Math.atan2(-dir.z, dir.x), Math.PI/2, "XYZ");
-    trunk.addShape(shoulderShape, dir.scale(0.5).vadd(new CANNON.Vec3(0,-dimensions.y,0)), q);
-    dir.x *= -1;
-    q.setFromEuler(0, Math.atan2(-dir.z, dir.x), Math.PI/2, "XYZ");
-    trunk.addShape(shoulderShape, dir.scale(0.5).vadd(new CANNON.Vec3(0,-dimensions.y,0)), q);
+  createTrunk = function(mass, material, pos, dimensions) {
+    var localInertia = new Ammo.btVector3(0, 0, 0);
+    var motionState = new Ammo.btDefaultMotionState();
+
+    var trunkShape = new Ammo.btCompoundShape();
+    var dir = new Ammo.btVector3(dimensions[0], 0, -dimensions[2]);
+    var shoulderLength = 0.5 * dir.length();
+    var backboneShape = new Ammo.btBoxShape(new Ammo.btVector3(0.2, dir.y(), 0.2));
+    var shoulderShape = new Ammo.btBoxShape(new Ammo.btVector3(0.2, shoulderLength, 0.2));
+
+    var rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, trunkShape, localInertia);
+    var trunk = new Ammo.btRigidBody(rbInfo);
+
+    var t = new Ammo.btTransform();
+    t.setIdentity();
+    trunkShape.addChildShape(t, backboneShape);
+
+    var q = new Ammo.btQuaternion();
+    // q.setEulerZYX(0, Math.atan2(-dir.z(), dir.x()), Math.PI/2);
+    t.setRotation(q);
+    t.setOrigin(new Ammo.btVector3(0.5*dir.x(),dimensions[1],0.5*dir.z()));
+    trunkShape.addChildShape(t, shoulderShape);
+
+    // q.setEulerZYX(0, Math.atan2(-dir.z(), -dir.x()), Math.PI/2);
+    t.setRotation(q);
+    t.setOrigin(new Ammo.btVector3(-0.5*dir.x(),dimensions[1],0.5*dir.z()));
+    trunkShape.addChildShape(t, shoulderShape);
+
+    // q.setEulerZYX(0, Math.atan2(-dir.z(), dir.x()), Math.PI/2);
+    t.setRotation(q);
+    t.setOrigin(new Ammo.btVector3(0.5*dir.x(),-dimensions[1],0.5*dir.z()));
+    trunkShape.addChildShape(t, shoulderShape);
+
+    // q.setEulerZYX(0, Math.atan2(-dir.z(), -dir.x()), Math.PI/2);
+    t.setRotation(q);
+    t.setOrigin(new Ammo.btVector3(-0.5*dir.x(),-dimensions[1],0.5*dir.z()));
+    trunkShape.addChildShape(t, shoulderShape);
 
     return trunk;
   }
@@ -278,7 +262,7 @@
       1,
       1000
     );
-    scene.camera.position.set( 30, -60, 50 );
+    scene.camera.position.set( 60, 60, 50 );
     scene.camera.up.set(0,0,1);
     scene.camera.lookAt( scene.position );
     scene.add( scene.camera );
@@ -294,95 +278,100 @@
     light.shadowCameraBottom = 60;
     light.shadowCameraNear = 20;
     light.shadowCameraFar = 200;
-    light.shadowBias = -.0005
+    light.shadowBias = -.0001
     light.shadowMapWidth = light.shadowMapHeight = 2048;
     light.shadowDarkness = .7;
     scene.add( light );
 
-    scene.world = new CANNON.World();
-    scene.world.gravity.set(0,0,-20);
-    
+    var collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
+    var dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
+    var overlappingPairCache = new Ammo.btDbvtBroadphase();
+    var solver = new Ammo.btSequentialImpulseConstraintSolver();
+    scene.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
+    scene.world.setGravity(new Ammo.btVector3(0,0,-20));
+
+    scene.world.bodies = [];
+
     // Materials
-    var groundMaterial = new CANNON.Material("groundMaterial");
-    groundMaterial.color = 0xeeeeee;
-    var boneMaterial = new CANNON.Material("boneMaterial");
-    boneMaterial.color = 0x66a5ff;
-    var bodyMaterial = new CANNON.Material("bodyMaterial");
-    bodyMaterial.color = 0xff6666;
-    var legGroundContactMaterial = new CANNON.ContactMaterial(groundMaterial,
-                                                              boneMaterial, 
-                                                              { friction: 0.3, restitution: 0.3 });
-    scene.world.addContactMaterial(legGroundContactMaterial);
+    // var groundMaterial = new CANNON.Material("groundMaterial");
+    // groundMaterial.color = 0xeeeeee;
+    // var boneMaterial = new CANNON.Material("boneMaterial");
+    // boneMaterial.color = 0x66a5ff;
+    // var bodyMaterial = new CANNON.Material("bodyMaterial");
+    // bodyMaterial.color = 0xff6666;
+    // var legGroundContactMaterial = new CANNON.ContactMaterial(groundMaterial,
+    //                                                           boneMaterial, 
+    //                                                           { friction: 0.3, restitution: 0.3 });
+    // scene.world.addContactMaterial(legGroundContactMaterial);
     
-    // Ground
-    var groundShape = new CANNON.Box(new CANNON.Vec3(50, 50, 0.5));
-    var ground = new CANNON.Body({ mass: 0, material: groundMaterial });
-    ground.addShape(groundShape);
-    
-    // Body
+    /* ground */
+    var ground = createGround();
+    scene.world.addRigidBody(ground);
+    scene.world.bodies.push(ground);
+
+    /* trunk */
     var mass = 2;
-    var bodyDimensions = new CANNON.Vec3(3.5, 5, 2.5);
-    var bodyShape = new CANNON.Box(bodyDimensions);
-    var body = new CANNON.Body({ mass: mass, material: bodyMaterial });
-    body.addShape(bodyShape);
-    body.position.z = 10;
+    var trunk = createTrunk(mass, null, [0, 0, 10], [3.5, 5, 2.5]);
+    scene.world.addRigidBody(trunk);
+    scene.world.bodies.push(trunk);
 
-    var trunk = buildTrunk(mass, boneMaterial, body.position, bodyDimensions);
-    scene.camera.target = trunk;
+    var legs = [];
+    // var legFL = createFrontLeg(mass, boneMaterial);
+    // respectJoints(legFL, new CANNON.Vec3(bodyDimensions.x, 
+    //                                      bodyDimensions.y,
+    //                                      trunk.position.z - bodyDimensions.z));
+    // legs.push(legFL);
+    // var legFR = createFrontLeg(mass, boneMaterial);
+    // legFR.upper.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+    // legFR.middle.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), 0);
+    // respectJoints(legFR, new CANNON.Vec3(-bodyDimensions.x, 
+    //                                      bodyDimensions.y,
+    //                                      trunk.position.z - bodyDimensions.z));
+    // legs.push(legFR);
+    // var legRL = createBackLeg(mass, boneMaterial);
+    // respectJoints(legRL, new CANNON.Vec3(bodyDimensions.x, 
+    //                                      -bodyDimensions.y,
+    //                                      trunk.position.z - bodyDimensions.z));
+    // legs.push(legRL);
+    // var legRR = createBackLeg(mass, boneMaterial);
+    // legRR.upper.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+    // respectJoints(legRR, new CANNON.Vec3(-bodyDimensions.x, 
+    //                                      -bodyDimensions.y,
+    //                                      trunk.position.z - bodyDimensions.z));
+    // legs.push(legRR);
 
-    var legFL = createFrontLeg(mass, boneMaterial);
-    respectJoints(legFL, new CANNON.Vec3(bodyDimensions.x, 
-                                         bodyDimensions.y,
-                                         trunk.position.z - bodyDimensions.z));
-    var legFR = createFrontLeg(mass, boneMaterial);
-    legFR.upper.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
-    legFR.middle.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), 0);
-    respectJoints(legFR, new CANNON.Vec3(-bodyDimensions.x, 
-                                         bodyDimensions.y,
-                                         trunk.position.z - bodyDimensions.z));
-    var legRL = createBackLeg(mass, boneMaterial);
-    respectJoints(legRL, new CANNON.Vec3(bodyDimensions.x, 
-                                         -bodyDimensions.y,
-                                         trunk.position.z - bodyDimensions.z));
-    var legRR = createBackLeg(mass, boneMaterial);
-    legRR.upper.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
-    respectJoints(legRR, new CANNON.Vec3(-bodyDimensions.x, 
-                                         -bodyDimensions.y,
-                                         trunk.position.z - bodyDimensions.z));
+    // legFL.upperMiddleMuscle.phase = -Math.PI/2;
+    // legFR.upperMiddleMuscle.phase = Math.PI/2;
+    // legRL.upperMiddleMuscle.phase = -Math.PI/2-Math.PI/4-Math.PI/8;
+    // legRR.upperMiddleMuscle.phase = Math.PI/2-Math.PI/4-Math.PI/8;
 
-    legFL.upperMiddleMuscle.phase = -Math.PI/2;
-    legFR.upperMiddleMuscle.phase = Math.PI/2;
-    legRL.upperMiddleMuscle.phase = -Math.PI/2-Math.PI/4+Math.PI/12;
-    legRR.upperMiddleMuscle.phase = Math.PI/2-Math.PI/4+Math.PI/12;
+    // legFL.middleLowerMuscle.phase = -Math.PI/2;
+    // legFR.middleLowerMuscle.phase = Math.PI/2;
+    // legRL.middleLowerMuscle.phase = -Math.PI/2-Math.PI/4-Math.PI/8;
+    // legRR.middleLowerMuscle.phase = Math.PI/2-Math.PI/4-Math.PI/8;
 
-    legFL.middleLowerMuscle.phase = -Math.PI/2;
-    legFR.middleLowerMuscle.phase = Math.PI/2;
-    legRL.middleLowerMuscle.phase = -Math.PI/2-Math.PI/4+Math.PI/12;
-    legRR.middleLowerMuscle.phase = Math.PI/2-Math.PI/4+Math.PI/12;
-
-    var legs = [legFL, legFR, legRL, legRR];
 
     var muscles = [];
-    var trunkLegFLMuscle = new CANNON.DistanceConstraint( trunk, legFL.upper, 8 );
-    trunkLegFLMuscle.midLength = 7;
-    trunkLegFLMuscle.delta = 0.3;
-    trunkLegFLMuscle.phase = Math.PI/2;
-    muscles.push(trunkLegFLMuscle);
-    var trunkLegFRMuscle = new CANNON.DistanceConstraint( trunk, legFR.upper, 8 );
-    trunkLegFRMuscle.midLength = 7;
-    trunkLegFRMuscle.delta = 0.3;
-    trunkLegFRMuscle.phase = -Math.PI/2;
-    muscles.push(trunkLegFRMuscle);
-    var trunkLegRLMuscle = new CANNON.DistanceConstraint( trunk, legRL.upper, 6 );
-    trunkLegRLMuscle.midLength = 6.75;
-    trunkLegRLMuscle.delta = 0.5;
-    trunkLegRLMuscle.phase = -Math.PI/2+Math.PI/4;
-    muscles.push(trunkLegRLMuscle);
-    var trunkLegRRMuscle = new CANNON.DistanceConstraint( trunk, legRR.upper, 6 );
-    trunkLegRRMuscle.midLength = 6.75;
-    trunkLegRRMuscle.delta = 0.5;
-    trunkLegRRMuscle.phase = Math.PI/2+Math.PI/4;
-    muscles.push(trunkLegRRMuscle);
+    // var trunkLegFLMuscle = new CANNON.DistanceConstraint( trunk, legFL.upper, 8 );
+    // trunkLegFLMuscle.midLength = 7;
+    // trunkLegFLMuscle.delta = 0.3;
+    // trunkLegFLMuscle.phase = Math.PI/2;
+    // muscles.push(trunkLegFLMuscle);
+    // var trunkLegFRMuscle = new CANNON.DistanceConstraint( trunk, legFR.upper, 8 );
+    // trunkLegFRMuscle.midLength = 7;
+    // trunkLegFRMuscle.delta = 0.3;
+    // trunkLegFRMuscle.phase = -Math.PI/2;
+    // muscles.push(trunkLegFRMuscle);
+    // var trunkLegRLMuscle = new CANNON.DistanceConstraint( trunk, legRL.upper, 6 );
+    // trunkLegRLMuscle.midLength = 6.75;
+    // trunkLegRLMuscle.delta = 0.5;
+    // trunkLegRLMuscle.phase = -Math.PI/2+Math.PI/4;
+    // muscles.push(trunkLegRLMuscle);
+    // var trunkLegRRMuscle = new CANNON.DistanceConstraint( trunk, legRR.upper, 6 );
+    // trunkLegRRMuscle.midLength = 6.75;
+    // trunkLegRRMuscle.delta = 0.5;
+    // trunkLegRRMuscle.phase = Math.PI/2+Math.PI/4;
+    // muscles.push(trunkLegRRMuscle);
 
     for( var i = 0; i < legs.length; i++ )
       muscles = muscles.concat(legs[i].muscles);
@@ -402,20 +391,20 @@
     }
 
     var omega = 0.5;
-    scene.world.addEventListener("preStep",function(event){
-        for( i in muscles ) {
-          updateMuscleLength(muscles[i], omega*this.time)
-          updateMuscleVisual(muscles[i]);
-        }
-    });
+    // scene.world.addEventListener("preStep",function(event){
+    //     for( i in muscles ) {
+    //       updateMuscleLength(muscles[i], omega*this.time)
+    //       updateMuscleVisual(muscles[i]);
+    //     }
+    // });
 
     // Constrain legs
     var constraints = [];
-    var leftAxis = new CANNON.Vec3(1,0,0);
-    constraints.push(new CANNON.HingeConstraint(trunk, legFL.upper,  { pivotA: new CANNON.Vec3( bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis,  pivotB: new CANNON.Vec3( 0, 0, legFL.upper.size.z ), axisB: leftAxis, collideConnected: false }));
-    constraints.push(new CANNON.HingeConstraint(trunk, legFR.upper, { pivotA: new CANNON.Vec3( -bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legFR.upper.size.z ), axisB: leftAxis, collideConnected: false }));
-    constraints.push(new CANNON.HingeConstraint(trunk, legRL.upper,   { pivotA: new CANNON.Vec3( bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legRL.upper.size.z ), axisB: leftAxis, collideConnected: false }));
-    constraints.push(new CANNON.HingeConstraint(trunk, legRR.upper,  { pivotA: new CANNON.Vec3( -bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legRR.upper.size.z ), axisB: leftAxis, collideConnected: false }));
+    // var leftAxis = new CANNON.Vec3(1,0,0);
+    // constraints.push(new CANNON.HingeConstraint(trunk, legFL.upper,  { pivotA: new CANNON.Vec3( bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis,  pivotB: new CANNON.Vec3( 0, 0, legFL.upper.size.z ), axisB: leftAxis, collideConnected: false }));
+    // constraints.push(new CANNON.HingeConstraint(trunk, legFR.upper, { pivotA: new CANNON.Vec3( -bodyDimensions.x, bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legFR.upper.size.z ), axisB: leftAxis, collideConnected: false }));
+    // constraints.push(new CANNON.HingeConstraint(trunk, legRL.upper,   { pivotA: new CANNON.Vec3( bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legRL.upper.size.z ), axisB: leftAxis, collideConnected: false }));
+    // constraints.push(new CANNON.HingeConstraint(trunk, legRR.upper,  { pivotA: new CANNON.Vec3( -bodyDimensions.x, -bodyDimensions.y, -bodyDimensions.z ), axisA: leftAxis, pivotB: new CANNON.Vec3( 0, 0, legRR.upper.size.z ), axisB: leftAxis, collideConnected: false }));
 
     for( var i = 0; i < legs.length; i++ )
       constraints = constraints.concat(legs[i].constraints);
@@ -425,21 +414,6 @@
 
     for(var i=0; i<constraints.length; i++) {
       scene.world.addConstraint(constraints[i]);
-    }
-
-    scene.world.add(ground);
-    addVisual(scene, ground);
-
-    // scene.world.add(body);
-    // addVisual(scene, body);
-
-    var bones = [trunk, 
-                 legFL.upper,legFR.upper,legRL.upper,legRR.upper,
-                 legFL.middle,legFR.middle,legRL.middle,legRR.middle,
-                 legFL.lower,legFR.lower,legRL.lower,legRR.lower];
-    for(var i=0; i<bones.length; i++){
-      scene.world.add(bones[i]);
-      addVisual(scene, bones[i]);
     }
 
     animate();
@@ -538,38 +512,44 @@
     m1.makeRotationZ(azimuth);
 
     /* raises the camera rotating around the X axis for the inclination */
-    m2.makeRotationX(inclination);
+    m2.makeRotationX(-inclination);
 
     /* moves the camera away from the center */
-    m3.makeTranslation(0, zoom, 0);
+    m3.makeTranslation(0, -zoom, 0);
 
     cameraPosMat.multiplyMatrices( m1, m2 );
     cameraPosMat.multiply( m3 );
 
     /* applies the transformation to the camera position */
     scene.camera.position.applyMatrix4(cameraPosMat);
-    scene.camera.position.add(scene.camera.target.position);
-    scene.camera.lookAt(scene.camera.target.position);
+    scene.camera.lookAt( scene.position );
   }
 
+  var time_last = Date.now();
+  var time_delta = 0;
   updatePhysics = function() {
       // Step world
-      var timeStep = 1 / 600;
-
-      for( var i = 0; i < 20; i++ )
-        scene.world.step(timeStep);
+      time_delta = Date.now() - time_last;
+      scene.world.stepSimulation(time_delta / 1000.0, 5);
+      time_last += time_delta;
   }
 
+  var trans = new Ammo.btTransform();
   updateVisuals = function() {
     // Read position data into visuals
-    for( var i=0; i<scene.world.bodies.length; i++ ) {
-      var b = scene.world.bodies[i], 
-      visual = b.visualref;
-      visual.position.copy(b.position);
-      if( b.quaternion ) {
-        visual.quaternion.copy(b.quaternion);
+    scene.world.bodies.forEach( function(b) {
+      if( b.getMotionState() && b.visualref !== undefined ) {
+        b.getMotionState().getWorldTransform(trans);
+
+        b.visualref.position.set(trans.getOrigin().x(), 
+                                 trans.getOrigin().y(), 
+                                 trans.getOrigin().z());
+        b.visualref.quaternion.set(trans.getRotation().w(), 
+                                   trans.getRotation().x(), 
+                                   trans.getRotation().y(), 
+                                   trans.getRotation().z());
       }
-    }
+    } );
   }
   
   animate = function() {
