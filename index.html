@@ -23,6 +23,7 @@
   var updateMuscleLength;
   var createGround;
   var createTrunk;
+  var createBone;
   var createFrontLeg
   var createBackLeg;
   var animate;
@@ -37,17 +38,14 @@
   var scene;
 
   addVisual = function(scene, body, material, geometry){
-    var mesh = new THREE.Mesh( sphere_geometry, material );
+    var mesh = new THREE.Mesh( geometry, material );
     mesh.receiveShadow = true;
     mesh.castShadow = true;
 
-    var obj = new THREE.Object3D();
-    obj.add(mesh);
+    body.visualref = new THREE.Object3D();
+    body.visualref.add(mesh);
 
-    if( mesh ) {
-      body.visualref = obj;
-      scene.add(obj);
-    }
+    scene.add(body.visualref);
   };
 
   updateMuscleVisual = function(muscle) {
@@ -78,45 +76,74 @@
     return new Ammo.btRigidBody(rbInfo);
   }
 
-  createTrunk = function(mass, material, pos, dimensions) {
+  createTrunk = function(mass, pos, dimensions) {
     var localInertia = new Ammo.btVector3(0, 0, 0);
-    var motionState = new Ammo.btDefaultMotionState();
-
-    var trunkShape = new Ammo.btCompoundShape();
-    var dir = new Ammo.btVector3(dimensions[0], 0, -dimensions[2]);
-    var shoulderLength = 0.5 * dir.length();
-    var backboneShape = new Ammo.btBoxShape(new Ammo.btVector3(0.2, dir.y(), 0.2));
-    var shoulderShape = new Ammo.btBoxShape(new Ammo.btVector3(0.2, shoulderLength, 0.2));
-
-    var rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, trunkShape, localInertia);
-    var trunk = new Ammo.btRigidBody(rbInfo);
 
     var t = new Ammo.btTransform();
+    t.setIdentity();
+    t.setOrigin(new Ammo.btVector3(0, 0, 10));
+
+    var motionState = new Ammo.btDefaultMotionState(t);
+
+    var trunkShape = new Ammo.btCompoundShape(true);
+    var dir = new Ammo.btVector3(dimensions[0], 0, -dimensions[2]);
+    var shoulderLength = 0.5 * dir.length();
+    var backboneShape = new Ammo.btBoxShape(new Ammo.btVector3(0.2, dimensions[1], 0.2));
+    var shoulderShape = new Ammo.btBoxShape(new Ammo.btVector3(0.2, shoulderLength, 0.2));
+
     t.setIdentity();
     trunkShape.addChildShape(t, backboneShape);
 
     var q = new Ammo.btQuaternion();
     // q.setEulerZYX(0, Math.atan2(-dir.z(), dir.x()), Math.PI/2);
-    t.setRotation(q);
+    // t.setRotation(q);
     t.setOrigin(new Ammo.btVector3(0.5*dir.x(),dimensions[1],0.5*dir.z()));
     trunkShape.addChildShape(t, shoulderShape);
 
     // q.setEulerZYX(0, Math.atan2(-dir.z(), -dir.x()), Math.PI/2);
-    t.setRotation(q);
+    // t.setRotation(q);
     t.setOrigin(new Ammo.btVector3(-0.5*dir.x(),dimensions[1],0.5*dir.z()));
     trunkShape.addChildShape(t, shoulderShape);
 
     // q.setEulerZYX(0, Math.atan2(-dir.z(), dir.x()), Math.PI/2);
-    t.setRotation(q);
+    // t.setRotation(q);
     t.setOrigin(new Ammo.btVector3(0.5*dir.x(),-dimensions[1],0.5*dir.z()));
     trunkShape.addChildShape(t, shoulderShape);
 
     // q.setEulerZYX(0, Math.atan2(-dir.z(), -dir.x()), Math.PI/2);
-    t.setRotation(q);
+    // t.setRotation(q);
     t.setOrigin(new Ammo.btVector3(-0.5*dir.x(),-dimensions[1],0.5*dir.z()));
     trunkShape.addChildShape(t, shoulderShape);
 
+    var rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, trunkShape, localInertia);
+    var trunk = new Ammo.btRigidBody(rbInfo);
+
     return trunk;
+  }
+
+  createBone = function(mass, pos, dimensions) {
+    var localInertia = new Ammo.btVector3(0, 0, 0);
+
+    var t = new Ammo.btTransform();
+    t.setIdentity();
+    t.setOrigin(new Ammo.btVector3(pos[0], pos[1], pos[2]));
+
+    var motionState = new Ammo.btDefaultMotionState(t);
+
+    var shape = new Ammo.btBoxShape(new Ammo.btVector3(dimensions[0], dimensions[1], dimensions[2]));
+
+    var rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, trunkShape, localInertia);
+    var body = new Ammo.btRigidBody(rbInfo);
+
+    var mesh = new THREE.Mesh( new THREE.BoxGeometry( dimensions[0], dimensions[1], dimensions[2] ), 
+                               new THREE.MeshLambertMaterial( { color: 0x66a5ff } ) );
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+
+    body.visualref = new THREE.Object3D();
+    body.visualref.add(mesh);
+
+    return body;
   }
 
   createFrontLeg = function(mass, material) {
@@ -308,12 +335,16 @@
     var ground = createGround();
     scene.world.addRigidBody(ground);
     scene.world.bodies.push(ground);
+    addVisual(scene, ground, new THREE.MeshLambertMaterial({color: 0xeeeeee}),
+                             new THREE.BoxGeometry( 50, 50, 0.5 ));
 
     /* trunk */
     var mass = 2;
-    var trunk = createTrunk(mass, null, [0, 0, 10], [3.5, 5, 2.5]);
+    var trunk = createTrunk(mass, [0, 0, 10], [3.5, 5, 2.5]);
     scene.world.addRigidBody(trunk);
     scene.world.bodies.push(trunk);
+    addVisual(scene, trunk, new THREE.MeshLambertMaterial({color: 0x66a5ff}),
+                            new THREE.BoxGeometry( 3.5, 5, 2.5 ));
 
     var legs = [];
     // var legFL = createFrontLeg(mass, boneMaterial);
