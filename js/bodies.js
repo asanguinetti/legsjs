@@ -1,3 +1,20 @@
+var three2BulletTransform = function(threeT, bulletT) {
+  t = bulletT
+  if(bulletT === undefined)
+    t = new Ammo.btTransform();
+
+  var p = new THREE.Vector3();
+  p.setFromMatrixPosition(threeT);
+  var q = new THREE.Quaternion();
+  q.setFromRotationMatrix(threeT);
+
+  t.setIdentity();
+  t.setOrigin(new Ammo.btVector3(p.x, p.y, p.z));
+  t.setRotation(new Ammo.btQuaternion(q.x, q.y, q.z, q.w));
+
+  return t;
+};
+
 var RigidBody = function(mass, size) {
   this.mass = mass;
   this.size = size;
@@ -82,15 +99,8 @@ Bone.prototype.constructor = Bone;
 
 Bone.prototype.buildRigidBody = function() {
   /* sets up the motion state from the current transform */
-  var p = new THREE.Vector3();
-  p.setFromMatrixPosition(this.transform);
-  var q = new THREE.Quaternion();
-  q.setFromRotationMatrix(this.transform);
-
   var t = new Ammo.btTransform();
-  t.setIdentity();
-  t.setOrigin(new Ammo.btVector3(p.x, p.y, p.z));
-  t.setRotation(new Ammo.btQuaternion(q.x, q.y, q.z, q.w));
+  three2BulletTransform(this.transform, t);
   var motionState = new Ammo.btDefaultMotionState(t);
   
   var localInertia = new Ammo.btVector3(0, 0, 0);
@@ -122,15 +132,8 @@ Ground.prototype.constructor = Ground;
 
 Ground.prototype.buildRigidBody = function() {
   /* sets up the motion state from the current transform */
-  var p = new THREE.Vector3();
-  p.setFromMatrixPosition(this.transform);
-  var q = new THREE.Quaternion();
-  q.setFromRotationMatrix(this.transform);
-
   var t = new Ammo.btTransform();
-  t.setIdentity();
-  t.setOrigin(new Ammo.btVector3(p.x, p.y, p.z));
-  t.setRotation(new Ammo.btQuaternion(q.x, q.y, q.z, q.w));
+  three2BulletTransform(this.transform, t);
   var motionState = new Ammo.btDefaultMotionState(t);
   
   var localInertia = new Ammo.btVector3(0, 0, 0);
@@ -154,6 +157,39 @@ Ground.prototype.buildVisual = function() {
 
 var Trunk = function(mass, size) {
   this.base.call(this, mass, size);
+
+  var dir = new THREE.Vector3(this.size.x, 0, -this.size.z);
+  var shoulderLength = 0.5*dir.length();
+
+  this.backbone = new Bone(mass, new THREE.Vector3(0.2, this.size.y, 0.2));
+
+  this.shoulderLeft = new Bone(mass, new THREE.Vector3(0.2, shoulderLength, 0.2));
+  this.shoulderLeft.rotateAxis(new THREE.Vector3(0, 0, 1), Math.PI/2);
+  this.shoulderLeft.rotateAxis(new THREE.Vector3(0, 1, 0), Math.atan2(-dir.z, dir.x));
+  this.shoulderLeft.snapTo(new THREE.Vector3(0, this.shoulderLeft.size.y, 0),
+                           this.backbone,
+                           new THREE.Vector3(0, this.backbone.size.y, 0));
+
+  this.shoulderRight = new Bone(mass, new THREE.Vector3(0.2, shoulderLength, 0.2));
+  this.shoulderRight.rotateAxis(new THREE.Vector3(0, 0, 1), Math.PI/2);
+  this.shoulderRight.rotateAxis(new THREE.Vector3(0, 1, 0), Math.atan2(-dir.z, -dir.x));
+  this.shoulderRight.snapTo(new THREE.Vector3(0, this.shoulderRight.size.y, 0),
+                            this.backbone,
+                            new THREE.Vector3(0, this.backbone.size.y, 0));
+
+  this.hipLeft = new Bone(mass, new THREE.Vector3(0.2, shoulderLength, 0.2));
+  this.hipLeft.rotateAxis(new THREE.Vector3(0, 0, 1), Math.PI/2);
+  this.hipLeft.rotateAxis(new THREE.Vector3(0, 1, 0), Math.atan2(-dir.z, dir.x));
+  this.hipLeft.snapTo(new THREE.Vector3(0, this.hipLeft.size.y, 0),
+                      this.backbone,
+                      new THREE.Vector3(0, -this.backbone.size.y, 0));
+
+  this.hipRight = new Bone(mass, new THREE.Vector3(0.2, shoulderLength, 0.2));
+  this.hipRight.rotateAxis(new THREE.Vector3(0, 0, 1), Math.PI/2);
+  this.hipRight.rotateAxis(new THREE.Vector3(0, 1, 0), Math.atan2(-dir.z, -dir.x));
+  this.hipRight.snapTo(new THREE.Vector3(0, this.hipRight.size.y, 0),
+                       this.backbone,
+                       new THREE.Vector3(0, -this.backbone.size.y, 0));
 };
 
 Trunk.prototype = new RigidBody;
@@ -164,41 +200,32 @@ Trunk.prototype.buildRigidBody = function() {
   var t = new Ammo.btTransform();
 
   /* sets up the motion state from the current transform */
-  var p = new THREE.Vector3();
-  p.setFromMatrixPosition(this.transform);
-  var q = new THREE.Quaternion();
-  q.setFromRotationMatrix(this.transform);
-
-  t.setIdentity();
-  t.setOrigin(new Ammo.btVector3(p.x, p.y, p.z));
-  t.setRotation(new Ammo.btQuaternion(q.x, q.y, q.z, q.w));
+  three2BulletTransform(this.transform, t);
   var motionState = new Ammo.btDefaultMotionState(t);
 
   var shape = new Ammo.btCompoundShape(true);
-  var dir = new Ammo.btVector3(this.size.x, 0, -this.size.z);
-  var shoulderLength = 0.5 * dir.length();
-  var backboneShape = new Ammo.btBoxShape(new Ammo.btVector3(0.2, this.size.y, 0.2));
-  var shoulderShape = new Ammo.btBoxShape(new Ammo.btVector3(0.2, shoulderLength, 0.2));
+  var backboneShape = new Ammo.btBoxShape(new Ammo.btVector3(0.9*this.backbone.size.x,
+                                                             0.9*this.backbone.size.y,
+                                                             0.9*this.backbone.size.z));
+  var shoulderShape = new Ammo.btBoxShape(new Ammo.btVector3(0.9*this.shoulderLeft.size.x,
+                                                             0.9*this.shoulderLeft.size.y,
+                                                             0.9*this.shoulderLeft.size.z));
 
   /* adds the backbone part */
-  t.setIdentity();
+  three2BulletTransform(this.backbone.transform, t);
   shape.addChildShape(t, backboneShape);
 
   /* adds the shoulders and hip bones */
-  t.getBasis().setEulerZYX(0, Math.atan2(-dir.z(), dir.x()), Math.PI/2);
-  t.setOrigin(new Ammo.btVector3(0.5*dir.x(),this.size.y,0.5*dir.z()));
+  three2BulletTransform(this.shoulderLeft.transform, t);
   shape.addChildShape(t, shoulderShape);
 
-  t.getBasis().setEulerZYX(0, Math.atan2(-dir.z(), -dir.x()), Math.PI/2);
-  t.setOrigin(new Ammo.btVector3(-0.5*dir.x(),this.size.y,0.5*dir.z()));
+  three2BulletTransform(this.shoulderRight.transform, t);
   shape.addChildShape(t, shoulderShape);
 
-  t.getBasis().setEulerZYX(0, Math.atan2(-dir.z(), dir.x()), Math.PI/2);
-  t.setOrigin(new Ammo.btVector3(0.5*dir.x(),-this.size.y,0.5*dir.z()));
+  three2BulletTransform(this.hipLeft.transform, t);
   shape.addChildShape(t, shoulderShape);
 
-  t.getBasis().setEulerZYX(0, Math.atan2(-dir.z(), -dir.x()), Math.PI/2);
-  t.setOrigin(new Ammo.btVector3(-0.5*dir.x(),-this.size.y,0.5*dir.z()));
+  three2BulletTransform(this.hipRight.transform, t);
   shape.addChildShape(t, shoulderShape);
 
   var localInertia = new Ammo.btVector3(0, 0, 0);
@@ -211,11 +238,21 @@ Trunk.prototype.buildRigidBody = function() {
 };
 
 Trunk.prototype.buildVisual = function() {
-  var mesh = new THREE.Mesh(new THREE.BoxGeometry(2*this.size.x, 2*this.size.y, 2*this.size.z), 
-                            new THREE.MeshLambertMaterial({color: 0x66a5ff}));
-  mesh.receiveShadow = true;
-  mesh.castShadow = true;
+  var visual = new THREE.Object3D();
+  
+  var segments = [this.backbone, 
+                  this.shoulderLeft, this.shoulderRight, 
+                  this.hipLeft, this.hipRight];
+  segments.forEach(function(segment) {
+    var mesh = new THREE.Mesh(new THREE.BoxGeometry(1.8*segment.size.x, 
+                                                    1.8*segment.size.y, 
+                                                    1.8*segment.size.z), 
+                              new THREE.MeshLambertMaterial({color: 0x66a5ff}));
+    mesh.applyMatrix(segment.transform);
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    visual.add(mesh);
+  });
 
-  this.visual = new THREE.Object3D();
-  this.visual.add(mesh);
+  this.visual = visual;
 };
