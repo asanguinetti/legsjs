@@ -60,6 +60,7 @@ RigidBody.prototype.snapTo = function(snapPoint, bodyB, snapPointB) {
 
 RigidBody.prototype.buildAndInsert = function(scene) {
   this.buildRigidBody();
+  this.body.setActivationState(4);
   scene.world.addRigidBody(this.body);
   scene.world.bodies.push(this);
 
@@ -255,4 +256,100 @@ Trunk.prototype.buildVisual = function() {
   });
 
   this.visual = visual;
+};
+
+var Muscle = function(bodyA, snapPointA, bodyB, snapPointB, restLength, delta, phase) {
+  this.restLength = restLength;
+  this.delta = delta;
+  this.phase = phase;
+
+  this.bodyA = bodyA;
+  this.snapPointA = snapPointA;
+  this.bodyB = bodyB;
+  this.snapPointB = snapPointB;
+
+  this.base.call(this, 1, new THREE.Vector3(0.1, 0.1, 0.5*restLength));
+};
+
+Muscle.prototype = new RigidBody;
+Muscle.prototype.base = RigidBody;
+Muscle.prototype.constructor = Muscle;
+
+Muscle.prototype.buildAndInsert = function(scene) {
+  /* converts the local snap point of object A to world frame */
+  var worldSnapPointA = new THREE.Vector4(this.snapPointA.x, 
+                                          this.snapPointA.y, 
+                                          this.snapPointA.z, 
+                                          1);
+  worldSnapPointA.applyMatrix4(this.bodyA.transform);
+
+  /* converts the local snap point of object B to world frame */
+  var worldSnapPointB = new THREE.Vector4(this.snapPointB.x, 
+                                          this.snapPointB.y, 
+                                          this.snapPointB.z, 
+                                          1);
+  worldSnapPointB.applyMatrix4(this.bodyB.transform);
+
+  var fwd = new THREE.Vector3();
+  fwd.subVectors(worldSnapPointB, worldSnapPointA);
+
+  var center = new THREE.Vector4();
+  center.addVectors(worldSnapPointA, fwd.multiplyScalar(0.5));
+
+  var q = new THREE.Quaternion();
+  q.setFromUnitVectors(new THREE.Vector3(0, 0, -1), fwd.normalize());
+  
+  this.transform.identity();
+  this.transform.makeRotationFromQuaternion(q);
+  this.transform.setPosition(center);
+
+  this.buildRigidBody();
+  this.body.setActivationState(4);
+  scene.world.addRigidBody(this.body, 1, 0);
+  scene.world.bodies.push(this);
+
+  this.buildVisual();
+  scene.add(this.visual);
+
+  this.c1 = new Ammo.btPoint2PointConstraint(this.bodyA.body, 
+                                             this.body,
+                                             new Ammo.btVector3(this.snapPointA.x,
+                                                                this.snapPointA.y,
+                                                                this.snapPointA.z),
+                                             new Ammo.btVector3(0, 0, 0.5*this.restLength));
+  this.c2 = new Ammo.btPoint2PointConstraint(this.bodyB.body, 
+                                             this.body,
+                                             new Ammo.btVector3(this.snapPointB.x,
+                                                                this.snapPointB.y,
+                                                                this.snapPointB.z),
+                                             new Ammo.btVector3(0, 0, -0.5*this.restLength));
+  scene.world.addConstraint(this.c1, true);
+  scene.world.addConstraint(this.c2, true);
+}
+
+Muscle.prototype.buildRigidBody = function() {
+  /* sets up the motion state from the current transform */
+  var t = new Ammo.btTransform();
+  three2BulletTransform(this.transform, t);
+  var motionState = new Ammo.btDefaultMotionState(t);
+  
+  var localInertia = new Ammo.btVector3(0, 0, 0);
+  var halfExtents = new Ammo.btVector3(0.9*this.size.x, 0.9*this.size.y, 0.9*this.size.z);
+  var shape = new Ammo.btBoxShape(halfExtents);
+  shape.calculateLocalInertia(this.mass,localInertia);
+  var rbInfo = new Ammo.btRigidBodyConstructionInfo(this.mass, motionState, 
+                                                    shape, localInertia);
+  this.body = new Ammo.btRigidBody(rbInfo);
+};
+
+Muscle.prototype.buildVisual = function() {
+  var mesh = new THREE.Mesh(new THREE.BoxGeometry(2*this.size.x, 
+                                                  2*this.size.y,
+                                                  2*this.size.z), 
+                            new THREE.MeshLambertMaterial({color: 0xff8888}));
+  mesh.receiveShadow = false;
+  mesh.castShadow = false;
+
+  this.visual = new THREE.Object3D();
+  this.visual.add(mesh);
 };

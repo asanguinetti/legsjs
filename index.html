@@ -71,21 +71,25 @@
     leg.lower.translate(0, 0, -leg.lower.size.z);
     leg.lower.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 8);
 
-    // leg.upperMiddleMuscle = new CANNON.DistanceConstraint( leg.upper, 
-    //                                                        leg.middle, 
-    //                                                        0.93 * (leg.upper.size.z + leg.middle.size.z) );
-    // leg.upperMiddleMuscle.midLength = leg.upperMiddleMuscle.distance;
-    // leg.upperMiddleMuscle.delta = leg.upperMiddleMuscle.midLength * 0.05;
+    leg.upperMiddleMuscle = new Muscle(leg.upper,
+                                       new THREE.Vector3(0, leg.upper.size.y, 0),
+                                       leg.middle,
+                                       new THREE.Vector3(0, leg.middle.size.y, 0),
+                                       0.93*(leg.upper.size.z + leg.middle.size.z),
+                                       0.5*(leg.upper.size.z + leg.middle.size.z),
+                                       0);
 
-    // leg.middleLowerMuscle = new CANNON.DistanceConstraint( leg.middle, 
-    //                                                        leg.lower, 
-    //                                                        1 * (leg.middle.size.z + leg.lower.size.z) );
-    // leg.middleLowerMuscle.midLength = leg.middleLowerMuscle.distance;
-    // leg.middleLowerMuscle.delta = leg.middleLowerMuscle.midLength * 0.03;
+    leg.middleLowerMuscle = new Muscle(leg.middle,
+                                       new THREE.Vector3(0, leg.middle.size.y, 0),
+                                       leg.lower,
+                                       new THREE.Vector3(0, leg.lower.size.y, 0),
+                                       0.93*(leg.middle.size.z + leg.lower.size.z),
+                                       0.03*(leg.middle.size.z + leg.lower.size.z),
+                                       0);
 
     leg.muscles = [];
-    // leg.muscles.push(leg.upperMiddleMuscle);
-    // leg.muscles.push(leg.middleLowerMuscle);
+    leg.muscles.push(leg.upperMiddleMuscle);
+    leg.muscles.push(leg.middleLowerMuscle);
 
     var leftAxis = new Ammo.btVector3(1, 0, 0);
     leg.constraints = [];
@@ -119,21 +123,25 @@
     leg.lower.translate(0, 0, -leg.lower.size.z);
     leg.lower.rotateAxis(new THREE.Vector3(1, 0, 0), 2*Math.PI / 8);
 
-    // leg.upperMiddleMuscle = new CANNON.DistanceConstraint( leg.upper, 
-    //                                                        leg.middle, 
-    //                                                        0.7 * (leg.upper.size.z + leg.middle.size.z));
-    // leg.upperMiddleMuscle.midLength = leg.upperMiddleMuscle.distance;
-    // leg.upperMiddleMuscle.delta = leg.upperMiddleMuscle.midLength * 0.2;
+    leg.upperMiddleMuscle = new Muscle(leg.upper,
+                                       new THREE.Vector3(0, -leg.upper.size.y, 0),
+                                       leg.middle,
+                                       new THREE.Vector3(0, -leg.middle.size.y, 0),
+                                       0.7*(leg.upper.size.z + leg.middle.size.z),
+                                       0.2*(leg.upper.size.z + leg.middle.size.z),
+                                       0);
 
-    // leg.middleLowerMuscle = new CANNON.DistanceConstraint( leg.middle, 
-    //                                                        leg.lower, 
-    //                                                        0.7 * (leg.middle.size.z + leg.lower.size.z) );
-    // leg.middleLowerMuscle.midLength = leg.middleLowerMuscle.distance;
-    // leg.middleLowerMuscle.delta = leg.middleLowerMuscle.midLength * 0.2;
+    leg.middleLowerMuscle = new Muscle(leg.middle,
+                                       new THREE.Vector3(0, leg.middle.size.y, 0),
+                                       leg.lower,
+                                       new THREE.Vector3(0, leg.lower.size.y, 0),
+                                       0.7*(leg.middle.size.z + leg.lower.size.z),
+                                       0.2*(leg.middle.size.z + leg.lower.size.z),
+                                       0);
 
     leg.muscles = [];
-    // leg.muscles.push(leg.upperMiddleMuscle);
-    // leg.muscles.push(leg.middleLowerMuscle);
+    leg.muscles.push(leg.upperMiddleMuscle);
+    leg.muscles.push(leg.middleLowerMuscle);
 
     var leftAxis = new Ammo.btVector3(1, 0, 0);
     leg.constraints = [];
@@ -224,12 +232,6 @@
 
     scene.world.bodies = [];
 
-    // Materials
-    // var legGroundContactMaterial = new CANNON.ContactMaterial(groundMaterial,
-    //                                                           boneMaterial, 
-    //                                                           { friction: 0.3, restitution: 0.3 });
-    // scene.world.addContactMaterial(legGroundContactMaterial);
-    
     /* ground */
     var ground = new Ground(new THREE.Vector3(50, 50, 0.5));
     ground.buildAndInsert(scene);
@@ -282,53 +284,24 @@
     // legRL.middleLowerMuscle.phase = -Math.PI/2-Math.PI/4-Math.PI/8;
     // legRR.middleLowerMuscle.phase = Math.PI/2-Math.PI/4-Math.PI/8;
 
-
     var muscles = [];
-    // var trunkLegFLMuscle = new CANNON.DistanceConstraint( trunk, legFL.upper, 8 );
-    // trunkLegFLMuscle.midLength = 7;
-    // trunkLegFLMuscle.delta = 0.3;
-    // trunkLegFLMuscle.phase = Math.PI/2;
-    // muscles.push(trunkLegFLMuscle);
-    // var trunkLegFRMuscle = new CANNON.DistanceConstraint( trunk, legFR.upper, 8 );
-    // trunkLegFRMuscle.midLength = 7;
-    // trunkLegFRMuscle.delta = 0.3;
-    // trunkLegFRMuscle.phase = -Math.PI/2;
-    // muscles.push(trunkLegFRMuscle);
-    // var trunkLegRLMuscle = new CANNON.DistanceConstraint( trunk, legRL.upper, 6 );
-    // trunkLegRLMuscle.midLength = 6.75;
-    // trunkLegRLMuscle.delta = 0.5;
-    // trunkLegRLMuscle.phase = -Math.PI/2+Math.PI/4;
-    // muscles.push(trunkLegRLMuscle);
-    // var trunkLegRRMuscle = new CANNON.DistanceConstraint( trunk, legRR.upper, 6 );
-    // trunkLegRRMuscle.midLength = 6.75;
-    // trunkLegRRMuscle.delta = 0.5;
-    // trunkLegRRMuscle.phase = Math.PI/2+Math.PI/4;
-    // muscles.push(trunkLegRRMuscle);
+    var orig = new THREE.Vector3(0, 0, 0);
 
-    for( var i = 0; i < legs.length; i++ )
-      muscles = muscles.concat(legs[i].muscles);
+    var trunkLegFLMuscle = new Muscle(trunk, orig, legFL.upper, orig,
+                                      7, 0.3, Math.PI/2);
+    muscles.push(trunkLegFLMuscle);
 
-    scene.showMuscles = false;
+    var trunkLegFRMuscle = new Muscle(trunk, orig, legFR.upper, orig,
+                                      7, 0.3, -Math.PI/2);
+    muscles.push(trunkLegFRMuscle);
 
-    for( var i = 0; i < muscles.length; i++ )
-    {
-      var muscle = muscles[i];
-      var mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry( 0.1, 0.1, 1.0 ),
-        new THREE.MeshLambertMaterial( { color: 0xff8888 } )
-      );
-      muscle.visual = mesh;
-      scene.add(mesh);
-      updateMuscleVisual(muscle);
-    }
+    var trunkLegRLMuscle = new Muscle(trunk, orig, legRL.upper, orig,
+                                      6.75, 0.5, -Math.PI/2+Math.PI/4);
+    muscles.push(trunkLegRLMuscle);
 
-    var omega = 0.5;
-    // scene.world.addEventListener("preStep",function(event){
-    //     for( i in muscles ) {
-    //       updateMuscleLength(muscles[i], omega*this.time)
-    //       updateMuscleVisual(muscles[i]);
-    //     }
-    // });
+    var trunkLegRRMuscle = new Muscle(trunk, orig, legRR.upper, orig,
+                                      6.75, 0.5, Math.PI/2+Math.PI/4);
+    muscles.push(trunkLegRRMuscle);
 
     // Constrain legs
     var constraints = [];
@@ -378,11 +351,25 @@
                                                 leftAxis,
                                                 leftAxis));
 
-    for( var i = 0; i < muscles.length; i++ )
-      scene.world.addConstraint(muscles[i]);
+    for( var i = 0; i < legs.length; i++ )
+      muscles = muscles.concat(legs[i].muscles);
+
+    muscles.forEach(function(muscle) {
+      muscle.buildAndInsert(scene);
+    });
+
+    scene.showMuscles = false;
+
+    var omega = 0.5;
+    // scene.world.addEventListener("preStep",function(event){
+    //     for( i in muscles ) {
+    //       updateMuscleLength(muscles[i], omega*this.time)
+    //       updateMuscleVisual(muscles[i]);
+    //     }
+    // });
 
     for(var i=0; i<constraints.length; i++) {
-      scene.world.addConstraint(constraints[i], false);
+      scene.world.addConstraint(constraints[i], true);
     }
 
     animate();
@@ -499,7 +486,7 @@
   updatePhysics = function() {
       // Step world
       time_delta = Date.now() - time_last;
-      scene.world.stepSimulation(time_delta / 1000.0, 5);
+      scene.world.stepSimulation(time_delta / 1000.0, 15, 0.005);
       time_last += time_delta;
   }
 
