@@ -221,6 +221,7 @@
     var trunk = new Trunk(mass, new THREE.Vector3(3.5, 5, 2.5));
     trunk.translate(0, 0, 10);
     trunk.buildAndInsert(scene);
+    scene.camera.target = trunk;
 
     var legs = [];
     var legFL = createFrontLeg(mass);
@@ -458,7 +459,8 @@
 
     /* applies the transformation to the camera position */
     scene.camera.position.applyMatrix4(cameraPosMat);
-    scene.camera.lookAt( scene.position );
+    scene.camera.position.add(scene.camera.target.visual.position);
+    scene.camera.lookAt(scene.camera.target.visual.position);
   }
 
   var time_last = Date.now();
@@ -471,7 +473,7 @@
 
       /* steps world */
       time_delta = Date.now() - time_last;
-      scene.world.stepSimulation(time_delta / 1000.0, 150, 0.005);
+      scene.world.stepSimulation(time_delta / 1000.0, 1500, 0.005);
       time_last += time_delta;
   }
 
