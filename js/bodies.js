@@ -15,9 +15,17 @@ var three2BulletTransform = function(threeT, bulletT) {
   return t;
 };
 
+var CollisionGroup = {
+  NONE: 0,
+  BONE: 1,
+  GROUND: 2,
+  MUSCLE: 4
+}
+
 var RigidBody = function(mass, size) {
   this.mass = mass;
   this.size = size;
+  this.collidesWith = CollisionGroup.GROUND;
   this.transform = new THREE.Matrix4();
   this.transformAux = new THREE.Matrix4();
   this.btTransformAux = new Ammo.btTransform();
@@ -61,7 +69,7 @@ RigidBody.prototype.snapTo = function(snapPoint, bodyB, snapPointB) {
 RigidBody.prototype.buildAndInsert = function(scene) {
   this.buildRigidBody();
   this.body.setActivationState(4);
-  scene.world.addRigidBody(this.body);
+  scene.world.addRigidBody(this.body, this.collisionGroup, this.collidesWith);
   scene.world.bodies.push(this);
 
   this.buildVisual();
@@ -92,6 +100,7 @@ RigidBody.prototype.buildVisual = function() {
 
 var Bone = function(mass, size) {
   this.base.call(this, mass, size);
+  this.collisionGroup = CollisionGroup.BONE;
 };
 
 Bone.prototype = new RigidBody;
@@ -125,6 +134,8 @@ Bone.prototype.buildVisual = function() {
 
 var Ground = function(size) {
   this.base.call(this, 0, size);
+  this.collisionGroup = CollisionGroup.GROUND;
+  this.collidesWith = CollisionGroup.BONE;
 };
 
 Ground.prototype = new RigidBody;
@@ -158,6 +169,7 @@ Ground.prototype.buildVisual = function() {
 
 var Trunk = function(mass, size) {
   this.base.call(this, mass, size);
+  this.collisionGroup = CollisionGroup.BONE;
 
   var dir = new THREE.Vector3(this.size.x, 0, -this.size.z);
   var shoulderLength = 0.5*dir.length();
@@ -259,6 +271,8 @@ Trunk.prototype.buildVisual = function() {
 };
 
 var Muscle = function(bodyA, snapPointA, bodyB, snapPointB, restLength, delta, phase) {
+  this.base.call(this, 1, new THREE.Vector3(0.1, 0.1, 0.5*restLength));
+
   this.restLength = restLength;
   this.delta = delta;
   this.phase = phase;
@@ -268,7 +282,8 @@ var Muscle = function(bodyA, snapPointA, bodyB, snapPointB, restLength, delta, p
   this.bodyB = bodyB;
   this.snapPointB = snapPointB;
 
-  this.base.call(this, 1, new THREE.Vector3(0.1, 0.1, 0.5*restLength));
+  this.collisionGroup = CollisionGroup.MUSCLE;
+  this.collidesWith = CollisionGroup.NONE;
 };
 
 Muscle.prototype = new RigidBody;
@@ -303,13 +318,7 @@ Muscle.prototype.buildAndInsert = function(scene) {
   this.transform.makeRotationFromQuaternion(q);
   this.transform.setPosition(center);
 
-  this.buildRigidBody();
-  this.body.setActivationState(4);
-  scene.world.addRigidBody(this.body, 1, 0);
-  scene.world.bodies.push(this);
-
-  this.buildVisual();
-  scene.add(this.visual);
+  RigidBody.prototype.buildAndInsert.call(this, scene);
 
   this.c1 = new Ammo.btPoint2PointConstraint(this.bodyA.body, 
                                              this.body,
