@@ -271,7 +271,7 @@ Trunk.prototype.buildVisual = function() {
 };
 
 var Muscle = function(bodyA, snapPointA, bodyB, snapPointB, restLength, delta, phase) {
-  this.base.call(this, 1, new THREE.Vector3(0.1, 0.1, 0.5*restLength));
+  this.base.call(this, 1, new THREE.Vector3(0.1, 0.5*restLength, 0.1));
 
   this.restLength = restLength;
   this.delta = delta;
@@ -312,7 +312,7 @@ Muscle.prototype.buildAndInsert = function(scene) {
   center.addVectors(worldSnapPointA, fwd.multiplyScalar(0.5));
 
   var q = new THREE.Quaternion();
-  q.setFromUnitVectors(new THREE.Vector3(0, 0, -1), fwd.normalize());
+  q.setFromUnitVectors(new THREE.Vector3(0, -1, 0), fwd.normalize());
   
   this.transform.identity();
   this.transform.makeRotationFromQuaternion(q);
@@ -325,15 +325,16 @@ Muscle.prototype.buildAndInsert = function(scene) {
                                              new Ammo.btVector3(this.snapPointA.x,
                                                                 this.snapPointA.y,
                                                                 this.snapPointA.z),
-                                             new Ammo.btVector3(0, 0, 0.5*this.restLength));
+                                             new Ammo.btVector3(0, 0.5*this.restLength, 0));
   this.c2 = new Ammo.btPoint2PointConstraint(this.bodyB.body, 
                                              this.body,
                                              new Ammo.btVector3(this.snapPointB.x,
                                                                 this.snapPointB.y,
                                                                 this.snapPointB.z),
-                                             new Ammo.btVector3(0, 0, -0.5*this.restLength));
+                                             new Ammo.btVector3(0, -0.5*this.restLength, 0));
   scene.world.addConstraint(this.c1, true);
   scene.world.addConstraint(this.c2, true);
+  this.update(0);
 }
 
 Muscle.prototype.buildRigidBody = function() {
@@ -352,9 +353,9 @@ Muscle.prototype.buildRigidBody = function() {
 };
 
 Muscle.prototype.buildVisual = function() {
-  var mesh = new THREE.Mesh(new THREE.BoxGeometry(2*this.size.x, 
-                                                  2*this.size.y,
-                                                  2*this.size.z), 
+  var mesh = new THREE.Mesh(new THREE.CylinderGeometry(this.size.x, 
+                                                       this.size.z,
+                                                       1), 
                             new THREE.MeshLambertMaterial({color: 0xff8888}));
   mesh.receiveShadow = false;
   mesh.castShadow = false;
@@ -362,3 +363,14 @@ Muscle.prototype.buildVisual = function() {
   this.visual = new THREE.Object3D();
   this.visual.add(mesh);
 };
+
+Muscle.prototype.update = function(t) {
+  this.curLength = this.restLength + this.delta * Math.sin(t*0.001 + this.phase);
+  this.c1.setPivotB(new Ammo.btVector3(0, 0.5*this.curLength, 0));
+  this.c2.setPivotB(new Ammo.btVector3(0, -0.5*this.curLength, 0));
+  this.visual.scale.y = this.curLength;
+
+  /* computes the color of the muscle */
+  var r = (this.curLength - this.restLength) / this.delta;
+  this.visual.children[0].material.color = new THREE.Color( 0.5 + 0.5*r, 0.5 - 0.5*r, 0 );;
+}
