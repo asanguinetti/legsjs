@@ -47,7 +47,7 @@
     leg.middle.translate(0, 0, -leg.middle.size.z);
     leg.middle.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 8);
 
-    leg.lower = new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0));
+    leg.lower = new Foot(mass, new THREE.Vector3(0.2, 0.2, 0.5));
     leg.lower.translate(0, 0, -leg.lower.size.z);
     leg.lower.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 8);
 
@@ -99,7 +99,7 @@
     leg.middle.translate(0, 0, -leg.middle.size.z);
     leg.middle.rotateAxis(new THREE.Vector3(1, 0, 0), -2*Math.PI / 8);
 
-    leg.lower = new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0));
+    leg.lower = new Foot(mass, new THREE.Vector3(0.2, 0.2, 1.0));
     leg.lower.translate(0, 0, -leg.lower.size.z);
     leg.lower.rotateAxis(new THREE.Vector3(1, 0, 0), 2*Math.PI / 8);
 
@@ -273,12 +273,12 @@
 
     var trunkLegFLMuscle = new Muscle(trunk, orig, legFL.upper, 
                                       new THREE.Vector3(0, -legFL.upper.size.y, 0),
-                                      6.9, 0.3, Math.PI/2);
+                                      7, 0.3, Math.PI/2);
     muscles.push(trunkLegFLMuscle);
 
     var trunkLegFRMuscle = new Muscle(trunk, orig, legFR.upper, 
                                       new THREE.Vector3(0, -legFR.upper.size.y, 0),
-                                      6.9, 0.3, -Math.PI/2);
+                                      7, 0.3, -Math.PI/2);
     muscles.push(trunkLegFRMuscle);
 
     var trunkLegRLMuscle = new Muscle(trunk, orig, legRL.upper, 

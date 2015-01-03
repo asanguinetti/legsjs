@@ -132,6 +132,70 @@ Bone.prototype.buildVisual = function() {
   this.visual.add(mesh);
 };
 
+var Foot = function(mass, size) {
+  this.base.call(this, mass, size);
+  this.heel = new Bone(mass, size);
+  this.forefoot = new Bone(mass, new THREE.Vector3(0.2, 0.2, 0.2));
+  this.forefoot.snapTo(new THREE.Vector3(0, 0, 0),
+                       this.heel,
+                       new THREE.Vector3(0, 0, -size.z - size.x));
+  this.collisionGroup = CollisionGroup.BONE;
+};
+
+Foot.prototype = new RigidBody;
+Foot.prototype.base = RigidBody;
+Foot.prototype.constructor = Foot;
+
+Foot.prototype.buildRigidBody = function() {
+  var t = new Ammo.btTransform();
+
+  /* sets up the motion state from the current transform */
+  three2BulletTransform(this.transform, t);
+  var motionState = new Ammo.btDefaultMotionState(t);
+
+  var shape = new Ammo.btCompoundShape(true);
+  var heelShape = new Ammo.btBoxShape(new Ammo.btVector3(0.9*this.heel.size.x,
+                                                         0.9*this.heel.size.y,
+                                                         0.9*this.heel.size.z));
+  var forefootShape = new Ammo.btSphereShape(0.9*this.forefoot.size.x);
+
+  /* adds the heel part */
+  three2BulletTransform(this.heel.transform, t);
+  shape.addChildShape(t, heelShape);
+
+  /* adds the forefoot */
+  three2BulletTransform(this.forefoot.transform, t);
+  shape.addChildShape(t, forefootShape);
+
+  var localInertia = new Ammo.btVector3(0, 0, 0);
+  shape.calculateLocalInertia(this.mass, localInertia);
+
+  var rbInfo = new Ammo.btRigidBodyConstructionInfo(this.mass, motionState, 
+                                                    shape, localInertia);
+  
+  this.body = new Ammo.btRigidBody(rbInfo);
+};
+
+Foot.prototype.buildVisual = function() {
+  var heel = new THREE.Mesh(new THREE.BoxGeometry(1.8*this.heel.size.x,
+                                                  1.8*this.heel.size.y,
+                                                  1.8*this.heel.size.z), 
+                            new THREE.MeshLambertMaterial({color: 0x66a5ff}));
+  heel.applyMatrix(this.heel.transform);
+  heel.receiveShadow = true;
+  heel.castShadow = false;
+
+  var forefoot = new THREE.Mesh(new THREE.SphereGeometry(0.9*this.forefoot.size.x), 
+                                new THREE.MeshLambertMaterial({color: 0x66a5ff}));
+  forefoot.applyMatrix(this.forefoot.transform);
+  forefoot.receiveShadow = true;
+  forefoot.castShadow = false;
+
+  this.visual = new THREE.Object3D();
+  this.visual.add(heel);
+  this.visual.add(forefoot);
+};
+
 var Ground = function(size) {
   this.base.call(this, 0, size);
   this.collisionGroup = CollisionGroup.GROUND;
@@ -155,6 +219,7 @@ Ground.prototype.buildRigidBody = function() {
   var rbInfo = new Ammo.btRigidBodyConstructionInfo(this.mass, motionState, 
                                                     shape, localInertia);
   this.body = new Ammo.btRigidBody(rbInfo);
+  this.body.setFriction(3);
 };
 
 Ground.prototype.buildVisual = function() {
