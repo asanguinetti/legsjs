@@ -334,6 +334,7 @@ Muscle.prototype.buildAndInsert = function(scene) {
                                              new Ammo.btVector3(0, -0.5*this.restLength, 0));
   scene.world.addConstraint(this.c1, true);
   scene.world.addConstraint(this.c2, true);
+  this.time = 0;
   this.update(0);
 }
 
@@ -364,8 +365,9 @@ Muscle.prototype.buildVisual = function() {
   this.visual.add(mesh);
 };
 
-Muscle.prototype.update = function(t) {
-  this.curLength = this.restLength + this.delta * Math.sin(t*0.001 + this.phase);
+Muscle.prototype.update = function(timeDelta) {
+  this.time += timeDelta;
+  this.curLength = this.restLength + this.delta * Math.sin(this.time + this.phase);
   this.c1.setPivotB(new Ammo.btVector3(0, 0.5*this.curLength, 0));
   this.c2.setPivotB(new Ammo.btVector3(0, -0.5*this.curLength, 0));
   this.visual.scale.y = this.curLength;

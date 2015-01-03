@@ -346,7 +346,14 @@
       muscle.buildAndInsert(scene);
     });
 
-    scene.muscles = muscles;
+    /* sets a callback for updating the muscles */
+    var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
+      muscles.forEach(function(muscle) {
+        muscle.update(timeStep);
+      });
+    });
+
+    scene.world.setInternalTickCallback(fp);
     scene.showMuscles = false;
 
     for(var i=0; i<constraints.length; i++) {
@@ -466,11 +473,6 @@
   var time_last = Date.now();
   var time_delta = 0;
   updatePhysics = function() {
-      /* updates the muscles */
-      scene.muscles.forEach(function(muscle) {
-        muscle.update(time_last);
-      });
-
       /* steps world */
       time_delta = Date.now() - time_last;
       scene.world.stepSimulation(time_delta / 1000.0, 1500, 0.005);
