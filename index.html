@@ -347,14 +347,14 @@
     });
 
     /* sets a callback for updating the muscles */
+    scene.showMuscles = false;
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
       muscles.forEach(function(muscle) {
-        muscle.update(timeStep);
+        muscle.update(timeStep, scene.showMuscles);
       });
     });
 
     scene.world.setInternalTickCallback(fp);
-    scene.showMuscles = false;
 
     for(var i=0; i<constraints.length; i++) {
       scene.world.addConstraint(constraints[i], true);

@@ -430,7 +430,7 @@ Muscle.prototype.buildVisual = function() {
   this.visual.add(mesh);
 };
 
-Muscle.prototype.update = function(timeDelta) {
+Muscle.prototype.update = function(timeDelta, showVisual) {
   this.time += timeDelta;
   this.curLength = this.restLength + this.delta * Math.sin(this.time + this.phase);
   this.c1.setPivotB(new Ammo.btVector3(0, 0.5*this.curLength, 0));
@@ -439,5 +439,6 @@ Muscle.prototype.update = function(timeDelta) {
 
   /* computes the color of the muscle */
   var r = (this.curLength - this.restLength) / this.delta;
-  this.visual.children[0].material.color = new THREE.Color( 0.5 + 0.5*r, 0.5 - 0.5*r, 0 );;
+  this.visual.children[0].material.color = new THREE.Color( 0.5 + 0.5*r, 0.5 - 0.5*r, 0 );
+  this.visual.visible = showVisual;
 }
