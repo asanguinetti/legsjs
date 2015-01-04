@@ -37,6 +37,58 @@
   // Internal objects
   var scene;
 
+  var DebugDrawer = function() {
+    var wrappedFrom;
+    var wrappedTo;
+    var wrappedColor;
+    var line;
+
+    this.debugMode = 0 | (1 << 11) | (1 << 12);
+    this.objIndex = 0;
+    this.objects = [];
+    for(var i = 0; i < 1500; i++)
+    {
+      this.objects.push(new THREE.Line(new THREE.Geometry(), 
+                                       new THREE.LineBasicMaterial({color: new THREE.Color()})));
+      this.objects[i].geometry.vertices.push(new THREE.Vector3());
+      this.objects[i].geometry.vertices.push(new THREE.Vector3());
+    }
+    this.btDebugDrawer = new Ammo.DebugDraw();
+    this.btDebugDrawer.userData = this;
+    this.btDebugDrawer.drawLine = function(from, to, color) {
+      wrappedFrom = Ammo.wrapPointer(from, Ammo.btVector3);
+      wrappedTo = Ammo.wrapPointer(to, Ammo.btVector3);
+      wrappedColor = Ammo.wrapPointer(color, Ammo.btVector3);
+
+      line = this.userData.objects[this.userData.objIndex++];
+      line.material.color.setRGB(wrappedColor.x(), wrappedColor.y(), wrappedColor.z());
+      line.geometry.vertices[0].set(wrappedFrom.x(), wrappedFrom.y(), wrappedFrom.z());
+      line.geometry.vertices[1].set(wrappedTo.x(), wrappedTo.y(), wrappedTo.z());
+      line.geometry.verticesNeedUpdate = true;
+
+      scene.add(line);
+    };
+    this.btDebugDrawer.drawContactPoint = function(PointOnB, normalOnB, distance, lifeTime, color) {
+      // TODO: implement
+    };
+    this.btDebugDrawer.reportErrorWarning = function(warningString) {
+      console.log(warningString);
+    };
+    this.btDebugDrawer.draw3dText = function(location, textString) {
+      // TODO: implement
+    };
+    this.btDebugDrawer.setDebugMode = function(debugMode) {
+      this.userData.debugMode = debugMode;
+    };
+    this.btDebugDrawer.getDebugMode = function() {
+      return this.userData.debugMode;
+    };
+  };
+
+  DebugDrawer.prototype.clear = function() {
+    this.objIndex = 0;
+  };
+
   createFrontLeg = function(mass) {
     var leg = {};
 
@@ -207,7 +259,9 @@
     var dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
     var overlappingPairCache = new Ammo.btDbvtBroadphase();
     var solver = new Ammo.btSequentialImpulseConstraintSolver();
+    scene.debugDrawer = new DebugDrawer();
     scene.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
+    scene.world.setDebugDrawer(scene.debugDrawer.btDebugDrawer);
     scene.world.setGravity(new Ammo.btVector3(0,0,-10));
 
     scene.world.bodies = [];
@@ -484,6 +538,8 @@
     scene.world.bodies.forEach( function(b) {
       b.updateVisual();
     } );
+    scene.world.debugDrawWorld();
+    scene.debugDrawer.clear();
   }
   
   animate = function() {
