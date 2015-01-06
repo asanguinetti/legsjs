@@ -336,7 +336,7 @@ Trunk.prototype.buildVisual = function() {
 };
 
 var Muscle = function(bodyA, snapPointA, bodyB, snapPointB, restLength, delta, phase) {
-  this.base.call(this, 1, new THREE.Vector3(0.1, 0.5*restLength, 0.1));
+  this.base.call(this, 2, new THREE.Vector3(0.1, 0.5*restLength, 0.1));
 
   this.restLength = restLength;
   this.delta = delta;

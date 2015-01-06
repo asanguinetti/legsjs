@@ -259,10 +259,10 @@
     var dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
     var overlappingPairCache = new Ammo.btDbvtBroadphase();
     var solver = new Ammo.btSequentialImpulseConstraintSolver();
-    scene.debugDrawer = new DebugDrawer();
+    // scene.debugDrawer = new DebugDrawer();
     scene.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
-    scene.world.setDebugDrawer(scene.debugDrawer.btDebugDrawer);
-    scene.world.setGravity(new Ammo.btVector3(0,0,-10));
+    // scene.world.setDebugDrawer(scene.debugDrawer.btDebugDrawer);
+    scene.world.setGravity(new Ammo.btVector3(0,0,-20));
 
     scene.world.bodies = [];
 
@@ -271,7 +271,7 @@
     ground.buildAndInsert(scene);
 
     /* trunk */
-    var mass = 1;
+    var mass = 2;
     var trunk = new Trunk(mass, new THREE.Vector3(3.5, 5, 2.5));
     trunk.translate(0, 0, 10);
     trunk.buildAndInsert(scene);
@@ -347,51 +347,52 @@
 
     // Constrain legs
     var constraints = [];
-    var leftAxis = new Ammo.btVector3(1, 0, 0);
+
+    var createHinge = function(rbA, rbB, pivotInA, pivotInB) {
+      var frameInA = new Ammo.btTransform();
+      var frameInB = new Ammo.btTransform();
+      frameInA.setIdentity();
+      frameInA.setOrigin(pivotInA);
+      frameInB.setIdentity();
+      frameInB.setOrigin(pivotInB);
+
+      var c = new Ammo.btGeneric6DofConstraint(rbA, rbB, frameInA, frameInB, true);
+      c.setAngularLowerLimit(new Ammo.btVector3(1, 0, 0));
+      c.setAngularUpperLimit(new Ammo.btVector3(0, 0, 0));
+      return c;
+    };
 
     legs.forEach(function(leg) {
       leg.upper.buildAndInsert(scene);
       leg.middle.buildAndInsert(scene);
       leg.lower.buildAndInsert(scene);
 
-      constraints.push(new Ammo.btHingeConstraint(leg.upper.body,
-                                                  leg.middle.body,
-                                                  new Ammo.btVector3(0, 0, -leg.upper.size.z),
-                                                  new Ammo.btVector3(0, 0, leg.middle.size.z),
-                                                  leftAxis,
-                                                  leftAxis));
-      constraints.push(new Ammo.btHingeConstraint(leg.middle.body,
-                                                  leg.lower.body,
-                                                  new Ammo.btVector3(0, 0, -leg.middle.size.z),
-                                                  new Ammo.btVector3(0, 0, leg.lower.size.z),
-                                                  leftAxis,
-                                                  leftAxis));
+      constraints.push(createHinge(leg.upper.body,
+                                   leg.middle.body,
+                                   new Ammo.btVector3(0, 0, -leg.upper.size.z),
+                                   new Ammo.btVector3(0, 0, leg.middle.size.z)));
+      constraints.push(createHinge(leg.middle.body,
+                                   leg.lower.body,
+                                   new Ammo.btVector3(0, 0, -leg.middle.size.z),
+                                   new Ammo.btVector3(0, 0, leg.lower.size.z)));
     });
 
-    constraints.push(new Ammo.btHingeConstraint(trunk.body, 
-                                                legFL.upper.body,
-                                                new Ammo.btVector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
-                                                new Ammo.btVector3(0, 0, legFL.upper.size.z),
-                                                leftAxis,
-                                                leftAxis));
-    constraints.push(new Ammo.btHingeConstraint(trunk.body, 
-                                                legFR.upper.body,
-                                                new Ammo.btVector3(trunk.size.x, trunk.size.y, -trunk.size.z),
-                                                new Ammo.btVector3(0, 0, legFR.upper.size.z),
-                                                leftAxis,
-                                                leftAxis));
-    constraints.push(new Ammo.btHingeConstraint(trunk.body, 
-                                                legRL.upper.body,
-                                                new Ammo.btVector3(-trunk.size.x, -trunk.size.y, -trunk.size.z),
-                                                new Ammo.btVector3(0, 0, legRL.upper.size.z),
-                                                leftAxis,
-                                                leftAxis));
-    constraints.push(new Ammo.btHingeConstraint(trunk.body, 
-                                                legRR.upper.body,
-                                                new Ammo.btVector3(trunk.size.x, -trunk.size.y, -trunk.size.z),
-                                                new Ammo.btVector3(0, 0, legRR.upper.size.z),
-                                                leftAxis,
-                                                leftAxis));
+    constraints.push(createHinge(trunk.body, 
+                                 legFL.upper.body,
+                                 new Ammo.btVector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
+                                 new Ammo.btVector3(0, 0, legFL.upper.size.z)));
+    constraints.push(createHinge(trunk.body, 
+                                 legFR.upper.body,
+                                 new Ammo.btVector3(trunk.size.x, trunk.size.y, -trunk.size.z),
+                                 new Ammo.btVector3(0, 0, legFR.upper.size.z)));
+    constraints.push(createHinge(trunk.body, 
+                                 legRL.upper.body,
+                                 new Ammo.btVector3(-trunk.size.x, -trunk.size.y, -trunk.size.z),
+                                 new Ammo.btVector3(0, 0, legRL.upper.size.z)));
+    constraints.push(createHinge(trunk.body, 
+                                 legRR.upper.body,
+                                 new Ammo.btVector3(trunk.size.x, -trunk.size.y, -trunk.size.z),
+                                 new Ammo.btVector3(0, 0, legRR.upper.size.z)));
 
     for( var i = 0; i < legs.length; i++ )
       muscles = muscles.concat(legs[i].muscles);
@@ -529,7 +530,7 @@
   updatePhysics = function() {
       /* steps world */
       time_delta = Date.now() - time_last;
-      scene.world.stepSimulation(time_delta / 1000.0, 1500, 0.005);
+      scene.world.stepSimulation(time_delta / 1000.0, 1500, 3 / 600);
       time_last += time_delta;
   }
 
@@ -539,7 +540,7 @@
       b.updateVisual();
     } );
     scene.world.debugDrawWorld();
-    scene.debugDrawer.clear();
+    // scene.debugDrawer.clear();
   }
   
   animate = function() {
