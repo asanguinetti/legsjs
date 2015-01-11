@@ -442,3 +442,34 @@ Muscle.prototype.update = function(timeDelta, showVisual) {
   this.visual.children[0].material.color = new THREE.Color( 0.5 + 0.5*r, 0.5 - 0.5*r, 0 );
   this.visual.visible = showVisual;
 }
+
+var Joint = function(bodyA, pivotInA, bodyB, pivotInB) {
+  /* TODO: add support for setting the joint axis */
+  this.bodyA = bodyA;
+  this.bodyB = bodyB;
+  this.pivotInA = pivotInA;
+  this.pivotInB = pivotInB;
+};
+
+Joint.prototype.buildAndInsert = function(scene) {
+  var frameInA = new Ammo.btTransform();
+  var frameInB = new Ammo.btTransform();
+  frameInA.setIdentity();
+  frameInA.setOrigin(new Ammo.btVector3(this.pivotInA.x,
+                                        this.pivotInA.y,
+                                        this.pivotInA.z));
+  frameInB.setIdentity();
+  frameInB.setOrigin(new Ammo.btVector3(this.pivotInB.x,
+                                        this.pivotInB.y,
+                                        this.pivotInB.z));
+
+  this.c = new Ammo.btGeneric6DofConstraint(this.bodyA.body, 
+                                            this.bodyB.body, 
+                                            frameInA, 
+                                            frameInB, 
+                                            true);
+  this.c.setAngularLowerLimit(new Ammo.btVector3(1, 0, 0));
+  this.c.setAngularUpperLimit(new Ammo.btVector3(0, 0, 0));
+
+  scene.world.addConstraint(this.c, true);
+};

@@ -123,21 +123,6 @@
     leg.muscles.push(leg.upperMiddleMuscle);
     leg.muscles.push(leg.middleLowerMuscle);
 
-    var leftAxis = new Ammo.btVector3(1, 0, 0);
-    leg.constraints = [];
-    leg.constraints.push(new Ammo.btHingeConstraint(leg.upper.body,
-                                                    leg.middle.body,
-                                                    new Ammo.btVector3(0, 0, -leg.upper.size.z),
-                                                    new Ammo.btVector3(0, 0, leg.middle.size.z),
-                                                    leftAxis,
-                                                    leftAxis));
-    leg.constraints.push(new Ammo.btHingeConstraint(leg.middle.body,
-                                                    leg.lower.body,
-                                                    new Ammo.btVector3(0, 0, -leg.middle.size.z),
-                                                    new Ammo.btVector3(0, 0, leg.lower.size.z),
-                                                    leftAxis,
-                                                    leftAxis));
-
     return leg;
   }
 
@@ -175,20 +160,6 @@
     leg.muscles.push(leg.upperMiddleMuscle);
     leg.muscles.push(leg.middleLowerMuscle);
 
-    var leftAxis = new Ammo.btVector3(1, 0, 0);
-    leg.constraints = [];
-    leg.constraints.push(new Ammo.btHingeConstraint(leg.upper.body,
-                                                    leg.middle.body,
-                                                    new Ammo.btVector3(0, 0, -leg.upper.size.z),
-                                                    new Ammo.btVector3(0, 0, leg.middle.size.z),
-                                                    leftAxis,
-                                                    leftAxis));
-    leg.constraints.push(new Ammo.btHingeConstraint(leg.middle.body,
-                                                    leg.lower.body,
-                                                    new Ammo.btVector3(0, 0, -leg.middle.size.z),
-                                                    new Ammo.btVector3(0, 0, leg.lower.size.z),
-                                                    leftAxis,
-                                                    leftAxis));
     return leg;
   }
 
@@ -346,53 +317,39 @@
     muscles.push(trunkLegRRMuscle);
 
     // Constrain legs
-    var constraints = [];
-
-    var createHinge = function(rbA, rbB, pivotInA, pivotInB) {
-      var frameInA = new Ammo.btTransform();
-      var frameInB = new Ammo.btTransform();
-      frameInA.setIdentity();
-      frameInA.setOrigin(pivotInA);
-      frameInB.setIdentity();
-      frameInB.setOrigin(pivotInB);
-
-      var c = new Ammo.btGeneric6DofConstraint(rbA, rbB, frameInA, frameInB, true);
-      c.setAngularLowerLimit(new Ammo.btVector3(1, 0, 0));
-      c.setAngularUpperLimit(new Ammo.btVector3(0, 0, 0));
-      return c;
-    };
-
+    var joints = [];
     legs.forEach(function(leg) {
       leg.upper.buildAndInsert(scene);
       leg.middle.buildAndInsert(scene);
       leg.lower.buildAndInsert(scene);
 
-      constraints.push(createHinge(leg.upper.body,
-                                   leg.middle.body,
-                                   new Ammo.btVector3(0, 0, -leg.upper.size.z),
-                                   new Ammo.btVector3(0, 0, leg.middle.size.z)));
-      constraints.push(createHinge(leg.middle.body,
-                                   leg.lower.body,
-                                   new Ammo.btVector3(0, 0, -leg.middle.size.z),
-                                   new Ammo.btVector3(0, 0, leg.lower.size.z)));
+      joints.push(new Joint(leg.upper,
+                            new THREE.Vector3(0, 0, -leg.upper.size.z),
+                            leg.middle,
+                            new THREE.Vector3(0, 0, leg.middle.size.z)));
+
+      joints.push(new Joint(leg.middle,
+                            new THREE.Vector3(0, 0, -leg.middle.size.z),
+                            leg.lower,
+                            new THREE.Vector3(0, 0, leg.lower.size.z)));
     });
 
-    constraints.push(createHinge(trunk.body, 
-                                 legFL.upper.body,
-                                 new Ammo.btVector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
-                                 new Ammo.btVector3(0, 0, legFL.upper.size.z)));
-    constraints.push(createHinge(trunk.body, 
-                                 legFR.upper.body,
-                                 new Ammo.btVector3(trunk.size.x, trunk.size.y, -trunk.size.z),
-                                 new Ammo.btVector3(0, 0, legFR.upper.size.z)));
-    constraints.push(createHinge(trunk.body, 
-                                 legRL.upper.body,
-                                 new Ammo.btVector3(-trunk.size.x, -trunk.size.y, -trunk.size.z),
-                                 new Ammo.btVector3(0, 0, legRL.upper.size.z)));
-    constraints.push(createHinge(trunk.body, 
-                                 legRR.upper.body,
-                                 new Ammo.btVector3(trunk.size.x, -trunk.size.y, -trunk.size.z),
-                                 new Ammo.btVector3(0, 0, legRR.upper.size.z)));
+    joints.push(new Joint(trunk, 
+                          new THREE.Vector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
+                          legFL.upper,
+                          new THREE.Vector3(0, 0, legFL.upper.size.z)));
+    joints.push(new Joint(trunk, 
+                          new THREE.Vector3(trunk.size.x, trunk.size.y, -trunk.size.z),
+                          legFR.upper,
+                          new THREE.Vector3(0, 0, legFR.upper.size.z)));
+    joints.push(new Joint(trunk, 
+                          new THREE.Vector3(-trunk.size.x, -trunk.size.y, -trunk.size.z),
+                          legRL.upper,
+                          new THREE.Vector3(0, 0, legRL.upper.size.z)));
+    joints.push(new Joint(trunk, 
+                          new THREE.Vector3(trunk.size.x, -trunk.size.y, -trunk.size.z),
+                          legRR.upper,
+                          new THREE.Vector3(0, 0, legRR.upper.size.z)));
 
     for( var i = 0; i < legs.length; i++ )
       muscles = muscles.concat(legs[i].muscles);
@@ -411,8 +368,8 @@
 
     scene.world.setInternalTickCallback(fp);
 
-    for(var i=0; i<constraints.length; i++) {
-      scene.world.addConstraint(constraints[i], true);
+    for(var i=0; i<joints.length; i++) {
+      joints[i].buildAndInsert(scene);
     }
 
     animate();
