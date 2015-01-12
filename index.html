@@ -354,19 +354,26 @@
     for( var i = 0; i < legs.length; i++ )
       muscles = muscles.concat(legs[i].muscles);
 
-    muscles.forEach(function(muscle) {
-      muscle.buildAndInsert(scene);
-    });
+    // muscles.forEach(function(muscle) {
+    //   muscle.buildAndInsert(scene);
+    // });
 
     /* sets a callback for updating the muscles */
     scene.showMuscles = false;
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
-      muscles.forEach(function(muscle) {
-        muscle.update(timeStep, scene.showMuscles);
+      // muscles.forEach(function(muscle) {
+      //   muscle.update(timeStep, scene.showMuscles);
+      // });
+      scene.world.clearForces();
+      scene.world.bodies.forEach( function(b) {
+        b.body.applyGravity();
+      } );
+      joints.forEach(function(joint) {
+        joint.update();
       });
     });
 
-    scene.world.setInternalTickCallback(fp);
+    scene.world.setInternalTickCallback(fp, undefined, true);
 
     for(var i=0; i<joints.length; i++) {
       joints[i].buildAndInsert(scene);

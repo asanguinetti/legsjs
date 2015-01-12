@@ -451,6 +451,13 @@ var Joint = function(bodyA, pivotInA, bodyB, pivotInB) {
   this.pivotInB = pivotInB;
 };
 
+Joint.prototype.update = function() {
+  /* TODO: add damping */
+  var torqueScalar = 100*(Math.PI/4 - this.c.getAngle(0));
+  this.bodyA.body.applyTorque(new Ammo.btVector3(torqueScalar, 0, 0));
+  this.bodyB.body.applyTorque(new Ammo.btVector3(-torqueScalar, 0, 0));
+}
+
 Joint.prototype.buildAndInsert = function(scene) {
   var frameInA = new Ammo.btTransform();
   var frameInB = new Ammo.btTransform();
