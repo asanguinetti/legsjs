@@ -453,6 +453,7 @@ var Joint = function(bodyA, pivotInA, bodyB, pivotInB) {
 
 Joint.prototype.update = function() {
   /* TODO: add damping */
+  /* TODO: the target angle should be a function of time */
   var torqueScalar = 100*(Math.PI/4 - this.c.getAngle(0));
   this.bodyA.body.applyTorque(new Ammo.btVector3(torqueScalar, 0, 0));
   this.bodyB.body.applyTorque(new Ammo.btVector3(-torqueScalar, 0, 0));
