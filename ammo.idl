@@ -351,6 +351,7 @@ interface btRigidBodyConstructionInfo {
 interface btRigidBody {
   void btRigidBody([Const, Ref] btRigidBodyConstructionInfo constructionInfo);
   
+  void applyGravity();
   [Const, Ref] btTransform getCenterOfMassTransform();
   void setCenterOfMassTransform([Const, Ref] btTransform xform);
   void setSleepingThresholds(float linear, float angular);
@@ -406,6 +407,14 @@ interface btGeneric6DofConstraint {
   void setLinearUpperLimit([Const, Ref] btVector3 linearUpper);
   void setAngularLowerLimit([Const, Ref] btVector3 angularLower);
   void setAngularUpperLimit([Const, Ref] btVector3 angularUpper);  
+  [Const, Ref] btTransform getCalculatedTransformA();
+  [Const, Ref] btTransform getCalculatedTransformB();
+  [Const, Ref] btTransform getFrameOffsetA();
+  [Const, Ref] btTransform getFrameOffsetB();
+  [Value] btVector3 getAxis(long axis_index);
+  float getAngle(long axis_index);
+  void setParam(long num, float value, long axis);
+  float getParam(long num, long axis);
 };
 btGeneric6DofConstraint implements btTypedConstraint;
 
@@ -531,6 +540,7 @@ interface btDynamicsWorld {
   void addAction(btActionInterface action);
   [Ref] btContactSolverInfo getSolverInfo();
   void setInternalTickCallback(btInternalTickCallback cb, VoidPtr worldUserInfo, boolean isPreTick);
+  void clearForces();
 };
 btDynamicsWorld implements btCollisionWorld;
 
