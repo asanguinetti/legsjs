@@ -3,6 +3,7 @@
 
 interface btVector3 {
   void btVector3();
+  void btVector3([Const, Ref] btVector3 v);
   void btVector3(float x, float y, float z);
   float length();
   float length2();
