@@ -5,6 +5,7 @@ interface btVector3 {
   void btVector3();
   void btVector3(float x, float y, float z);
   float length();
+  float length2();
   float x();
   float y();
   float z();
@@ -12,7 +13,14 @@ interface btVector3 {
   void setY(float y);
   void setZ(float z);
   void setValue(float x, float y, float z);
+  [Operator="+=", Ref] btVector3 op_add([Const, Ref] btVector3 v);
+  [Operator="-=", Ref] btVector3 op_sub([Const, Ref] btVector3 v);
   [Operator="*=", Ref] btVector3 op_mul(float x);
+  [Operator="/=", Ref] btVector3 op_div(float x);
+  float dot([Const, Ref] btVector3 v);
+  [Value] btVector3 cross([Const, Ref] btVector3 v);
+  [Ref] btVector3 normalize();
+  [Value] btVector3 normalized();
 };
 
 interface btVector4 {
