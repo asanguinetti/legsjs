@@ -452,11 +452,24 @@ var Joint = function(bodyA, pivotInA, bodyB, pivotInB) {
 };
 
 Joint.prototype.update = function() {
-  /* TODO: add damping */
   /* TODO: the target angle should be a function of time */
-  var torqueScalar = 100*(Math.PI/4 - this.c.getAngle(0));
-  this.bodyA.body.applyTorque(new Ammo.btVector3(torqueScalar, 0, 0));
-  this.bodyB.body.applyTorque(new Ammo.btVector3(-torqueScalar, 0, 0));
+  var jointAxis = new Ammo.btVector3(this.c.getAxis(0));
+
+  /* calculates the relative angular velocity of the two objects */
+  var deltaOmega = new Ammo.btVector3(this.bodyA.body.getAngularVelocity());
+  deltaOmega.op_sub(this.bodyB.body.getAngularVelocity())
+
+  /* calculates the projection of the relative angular velocity along the joint axis */
+  var jointVel = deltaOmega.dot(jointAxis);
+
+  /* calculates the torque to apply using PD */
+  var torqueScalar = 2000*(0 - this.c.getAngle(0)) + 60*(0 - jointVel);
+
+  /* applies the equal and opposite torques to both objects */
+  jointAxis.op_mul(torqueScalar);
+  this.bodyA.body.applyTorque(jointAxis);
+  jointAxis.op_mul(-1);
+  this.bodyB.body.applyTorque(jointAxis);
 }
 
 Joint.prototype.buildAndInsert = function(scene) {
