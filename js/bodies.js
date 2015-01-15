@@ -449,6 +449,7 @@ var Joint = function(bodyA, pivotInA, bodyB, pivotInB) {
   this.bodyB = bodyB;
   this.pivotInA = pivotInA;
   this.pivotInB = pivotInB;
+  this.targetAngle = 0;
 };
 
 Joint.prototype.update = function() {
@@ -463,7 +464,7 @@ Joint.prototype.update = function() {
   var jointVel = deltaOmega.dot(jointAxis);
 
   /* calculates the torque to apply using PD */
-  var torqueScalar = 2000*(0 - this.c.getAngle(0)) + 60*(0 - jointVel);
+  var torqueScalar = 2000*(this.targetAngle - this.c.getAngle(0)) + 60*(0 - jointVel);
 
   /* applies the equal and opposite torques to both objects */
   jointAxis.op_mul(torqueScalar);
