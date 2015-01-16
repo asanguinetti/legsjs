@@ -151,26 +151,6 @@
     leg.lower.translate(0, 0, -leg.lower.size.z);
     leg.lower.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 8);
 
-    leg.upperMiddleMuscle = new Muscle(leg.upper,
-                                       new THREE.Vector3(0, leg.upper.size.y, 0),
-                                       leg.middle,
-                                       new THREE.Vector3(0, leg.middle.size.y, 0),
-                                       0.93*(leg.upper.size.z + leg.middle.size.z),
-                                       0.05*(leg.upper.size.z + leg.middle.size.z),
-                                       0);
-
-    leg.middleLowerMuscle = new Muscle(leg.middle,
-                                       new THREE.Vector3(0, leg.middle.size.y, 0),
-                                       leg.lower,
-                                       new THREE.Vector3(0, leg.lower.size.y, 0),
-                                       0.93*(leg.middle.size.z + leg.lower.size.z),
-                                       0.03*(leg.middle.size.z + leg.lower.size.z),
-                                       0);
-
-    leg.muscles = [];
-    leg.muscles.push(leg.upperMiddleMuscle);
-    leg.muscles.push(leg.middleLowerMuscle);
-
     return leg;
   }
 
@@ -187,26 +167,6 @@
     leg.lower = new Foot(mass, new THREE.Vector3(0.2, 0.2, 1.0));
     leg.lower.translate(0, 0, -leg.lower.size.z);
     leg.lower.rotateAxis(new THREE.Vector3(1, 0, 0), 2*Math.PI / 8);
-
-    leg.upperMiddleMuscle = new Muscle(leg.upper,
-                                       new THREE.Vector3(0, -leg.upper.size.y, 0),
-                                       leg.middle,
-                                       new THREE.Vector3(0, -leg.middle.size.y, 0),
-                                       0.7*(leg.upper.size.z + leg.middle.size.z),
-                                       0.2*(leg.upper.size.z + leg.middle.size.z),
-                                       0);
-
-    leg.middleLowerMuscle = new Muscle(leg.middle,
-                                       new THREE.Vector3(0, leg.middle.size.y, 0),
-                                       leg.lower,
-                                       new THREE.Vector3(0, leg.lower.size.y, 0),
-                                       0.7*(leg.middle.size.z + leg.lower.size.z),
-                                       0.2*(leg.middle.size.z + leg.lower.size.z),
-                                       0);
-
-    leg.muscles = [];
-    leg.muscles.push(leg.upperMiddleMuscle);
-    leg.muscles.push(leg.middleLowerMuscle);
 
     return leg;
   }
@@ -237,15 +197,6 @@
     scene.renderer.domElement.addEventListener("mousewheel", onMouseWheel, false);
     scene.renderer.domElement.addEventListener("DOMMouseScroll", onMouseWheel, false);
     scene.renderer.domElement.addEventListener('mousemove', onMouseMove);
-    window.addEventListener("keydown", onKeyDown);
-
-    scene.info = document.createElement( 'div' );
-    scene.info.style.position = 'absolute';
-    scene.info.style.top = '10px';
-    scene.info.style.width = '100%';
-    scene.info.style.textAlign = 'center';
-    scene.info.innerHTML = '<h1>Press \'1\' to toggle muscle rendering</h1>';
-    document.getElementById( 'viewport' ).appendChild( scene.info );
 
     scene.camera = new THREE.PerspectiveCamera(
       35,
@@ -331,39 +282,6 @@
                   new THREE.Vector3(trunk.size.x, -trunk.size.y, -trunk.size.z));
     legs.push(legRR);
 
-    legFL.upperMiddleMuscle.phase = -Math.PI/2;
-    legFR.upperMiddleMuscle.phase = Math.PI/2;
-    legRL.upperMiddleMuscle.phase = -Math.PI/2-Math.PI/4+Math.PI/8;
-    legRR.upperMiddleMuscle.phase = Math.PI/2-Math.PI/4+Math.PI/8;
-
-    legFL.middleLowerMuscle.phase = -Math.PI/2;
-    legFR.middleLowerMuscle.phase = Math.PI/2;
-    legRL.middleLowerMuscle.phase = -Math.PI/2-Math.PI/4+Math.PI/8;
-    legRR.middleLowerMuscle.phase = Math.PI/2-Math.PI/4+Math.PI/8;
-
-    var muscles = [];
-    var orig = new THREE.Vector3(0, 0, 0);
-
-    var trunkLegFLMuscle = new Muscle(trunk, orig, legFL.upper, 
-                                      new THREE.Vector3(0, -legFL.upper.size.y, 0),
-                                      7, 0.3, Math.PI/2);
-    muscles.push(trunkLegFLMuscle);
-
-    var trunkLegFRMuscle = new Muscle(trunk, orig, legFR.upper, 
-                                      new THREE.Vector3(0, -legFR.upper.size.y, 0),
-                                      7, 0.3, -Math.PI/2);
-    muscles.push(trunkLegFRMuscle);
-
-    var trunkLegRLMuscle = new Muscle(trunk, orig, legRL.upper, 
-                                      new THREE.Vector3(0, legRL.upper.size.y, 0),
-                                      6.75, 0.5, -Math.PI/2+Math.PI/4);
-    muscles.push(trunkLegRLMuscle);
-
-    var trunkLegRRMuscle = new Muscle(trunk, orig, legRR.upper, 
-                                      new THREE.Vector3(0, legRL.upper.size.y, 0),
-                                      6.75, 0.5, Math.PI/2+Math.PI/4);
-    muscles.push(trunkLegRRMuscle);
-
     // Constrain legs
     var joints = [];
     legs.forEach(function(leg) {
@@ -399,21 +317,11 @@
                           legRR.upper,
                           new THREE.Vector3(0, 0, legRR.upper.size.z)));
 
-    for( var i = 0; i < legs.length; i++ )
-      muscles = muscles.concat(legs[i].muscles);
-
-    // muscles.forEach(function(muscle) {
-    //   muscle.buildAndInsert(scene);
-    // });
-
-    /* sets a callback for updating the muscles */
+    /* sets a callback for updating the torques on the joints */
     scene.showMuscles = false;
     var time = 0;
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
       time += timeStep;
-      // muscles.forEach(function(muscle) {
-      //   muscle.update(timeStep, scene.showMuscles);
-      // });
       scene.world.clearForces();
       scene.world.bodies.forEach( function(b) {
         b.body.applyGravity();
@@ -447,12 +355,6 @@
 
     animate();
   };
-
-  onKeyDown = function(event) {
-    if( event.key !== 'undefined' && event.key == '1' ||
-        event.keyCode == 49 )
-      scene.showMuscles = !scene.showMuscles;
-  }
 
   var pinchDist = 0;
   onTouchStart = function(event) {
