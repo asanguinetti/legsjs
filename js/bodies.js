@@ -15,6 +15,53 @@ var three2BulletTransform = function(threeT, bulletT) {
   return t;
 };
 
+/**
+ * Solves a planar inverse kinematic problem with 3 links and 3 rotational joints.
+ * \param list q1 List of target joint angles starting from the closest to the 
+ *                base (1st solution).
+ * \param list q2 List of target joint angles starting from the closest to the 
+ *                base (2nd solution).
+ * \param list l List of link lengths conforming the chain, starting from 
+ *               the closest to the base.
+ * \param list p End-effector position and orientation.
+ * \return list List of joint angles starting from the closest to the base.
+ */
+var ikSolve = function(q1, q2, l, p) {
+  /* TODO: make a "best effort" in case there is no solution */
+  var w = [];
+
+  /* gets the position and angle of the wrist from the following equations.
+   * w_x = p_x - l_3*sin(phi)
+   * w_y = p_y + l_3*cos(phi)
+   * alpha = atan(-w_y/w_x) 
+   */
+  w[0] = p[0] - l[2]*Math.sin(p[2]);
+  w[1] = p[1] + l[2]*Math.cos(p[2]);
+  w[2] = Math.atan2(w[0], -w[1]);
+
+  /* gets q_2 as the supplement of beta which is itself calculated from the
+   * cosine theorem 
+   * q_2 = PI - beta
+   * l_1^2 + l_2^2 - 2*l_1*l_2*cos(beta) = w_x^2 + w_y^2
+   */
+  q1[1] = Math.PI - Math.acos((l[0]*l[0] + l[1]*l[1] - w[0]*w[0] - w[1]*w[1])/(2*l[0]*l[1]));
+  q2[1] = -q1[1]
+
+
+  /* similarly:
+   * q_1 = alpha - gamma
+   * l_1^2 + w_x^2 + w_y^2 - 2*l_1*sqrt(w_x^2 + w_y^2)*cos(gamma) = l_2^2
+   */
+   q1[0] = w[2] - Math.acos((l[0]*l[0] - l[1]*l[1] + w[0]*w[0] + w[1]*w[1])/(2*l[0]*Math.sqrt(w[0]*w[0] + w[1]*w[1])));
+   q2[0] = 2*w[2] - q1[0];
+
+   /* finally:
+    * q_3 = phi - q_2 - q_1
+    */
+   q1[2] = p[2] - q1[1] - q1[0];
+   q2[2] = p[2] - q2[1] - q2[0];
+};
+
 var CollisionGroup = {
   NONE: 0,
   BONE: 1,
@@ -387,3 +434,81 @@ Joint.prototype.buildAndInsert = function(scene) {
 
   scene.world.addConstraint(this.c, true);
 };
+
+var Leg = function(trunk, pivot, segments) {
+  this.trunk = trunk;
+  this.pivot = pivot;
+  this.segments = segments;
+  this.joints = [];
+  this.time = 0;
+  this.q1 = [];
+  this.q2 = [];
+
+  /* TODO: place the segments in the right orientation using IK */
+
+  /* adds the shoulder/hip joint */
+  segments[0].snapTo(new THREE.Vector3(0, 0, segments[0].size.z), trunk, pivot);
+  this.joints.push(
+      new Joint(trunk,
+                pivot,
+                segments[0],
+                new THREE.Vector3(0, 0, segments[0].size.z))
+  );
+
+  /* adds the rest of the joints */
+  for(var i = 1; i < segments.length; i++) {
+    segments[i].snapTo(new THREE.Vector3(0, 0, segments[i].size.z),
+                       segments[i-1],
+                       new THREE.Vector3(0, 0, -segments[i-1].size.z));
+    this.joints.push(
+      new Joint(segments[i - 1],
+                new THREE.Vector3(0, 0, -segments[i-1].size.z),
+                segments[i],
+                new THREE.Vector3(0, 0, segments[i].size.z))
+    );
+  }
+};
+
+Leg.prototype.buildAndInsert = function(scene) {
+  /* buils and inserts the leg segments */
+  this.segments.forEach(function(segment) {
+    segment.buildAndInsert(scene);
+  });
+
+  /* buils and inserts the leg joints */
+  this.joints.forEach(function(joint) {
+    joint.buildAndInsert(scene);
+  });
+};
+
+Leg.prototype.update = function(timeStep) {
+  this.time += timeStep;
+  ikSolve(this.q1, this.q2,
+          [2*this.segments[0].size.z,
+           2*this.segments[1].size.z,
+           2*this.segments[2].size.z],
+          [0, -4 + 0.5*Math.sin(this.time), -Math.PI/8 + 0.1*Math.sin(this.time)]);
+
+  for(var i = 0; i < this.joints.length; i++) {
+    this.joints[i].targetAngle = this.q[i];
+    this.joints[i].update();
+  };
+};
+
+var FrontLeg = function(trunk, pivot, segments) {
+  this.base.call(this, trunk, pivot, segments);
+  this.q = this.q2;
+};
+
+FrontLeg.prototype = Leg.prototype;
+FrontLeg.prototype.base = Leg;
+FrontLeg.prototype.constructor = FrontLeg;
+
+var RearLeg = function(trunk, pivot, segments) {
+  this.base.call(this, trunk, pivot, segments);
+  this.q = this.q1;
+};
+
+RearLeg.prototype = Leg.prototype;
+RearLeg.prototype.base = Leg;
+RearLeg.prototype.constructor = RearLeg;

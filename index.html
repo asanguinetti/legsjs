@@ -89,99 +89,6 @@
   DebugDrawer.prototype.clear = function() {
     this.objIndex = 0;
   };
-
-  /**
-   * Solves a planar inverse kinematic problem with 3 links and 3 rotational joints.
-   * \param list q1 List of target joint angles starting from the closest to the 
-   *                base (1st solution).
-   * \param list q2 List of target joint angles starting from the closest to the 
-   *                base (2nd solution).
-   * \param list l List of link lengths conforming the chain, starting from 
-   *               the closest to the base.
-   * \param list p End-effector position and orientation.
-   * \return list List of joint angles starting from the closest to the base.
-   */
-  ikSolve = function(q1, q2, l, p) {
-    /* TODO: make a "best effort" in case there is no solution */
-    var w = [];
-
-    /* gets the position and angle of the wrist from the following equations.
-     * w_x = p_x - l_3*sin(phi)
-     * w_y = p_y + l_3*cos(phi)
-     * alpha = atan(-w_y/w_x) 
-     */
-    w[0] = p[0] - l[2]*Math.sin(p[2]);
-    w[1] = p[1] + l[2]*Math.cos(p[2]);
-    w[2] = Math.atan2(w[0], -w[1]);
-
-    /* gets q_2 as the supplement of beta which is itself calculated from the
-     * cosine theorem 
-     * q_2 = PI - beta
-     * l_1^2 + l_2^2 - 2*l_1*l_2*cos(beta) = w_x^2 + w_y^2
-     */
-    q1[1] = Math.PI - Math.acos((l[0]*l[0] + l[1]*l[1] - w[0]*w[0] - w[1]*w[1])/(2*l[0]*l[1]));
-    q2[1] = -q1[1]
-
-
-    /* similarly:
-     * q_1 = alpha - gamma
-     * l_1^2 + w_x^2 + w_y^2 - 2*l_1*sqrt(w_x^2 + w_y^2)*cos(gamma) = l_2^2
-     */
-     q1[0] = w[2] - Math.acos((l[0]*l[0] - l[1]*l[1] + w[0]*w[0] + w[1]*w[1])/(2*l[0]*Math.sqrt(w[0]*w[0] + w[1]*w[1])));
-     q2[0] = 2*w[2] - q1[0];
-
-     /* finally:
-      * q_3 = phi - q_2 - q_1
-      */
-     q1[2] = p[2] - q1[1] - q1[0];
-     q2[2] = p[2] - q2[1] - q2[0];
-  };
-
-  createFrontLeg = function(mass) {
-    var leg = {};
-
-    leg.upper = new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0));
-    leg.upper.translate(0, 0, -leg.upper.size.z);
-
-    leg.middle = new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0));
-    leg.middle.translate(0, 0, -leg.middle.size.z);
-    leg.middle.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 8);
-
-    leg.lower = new Foot(mass, new THREE.Vector3(0.2, 0.2, 0.5));
-    leg.lower.translate(0, 0, -leg.lower.size.z);
-    leg.lower.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 8);
-
-    return leg;
-  }
-
-  createBackLeg = function(mass) {
-    var leg = {};
-
-    leg.upper = new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0));
-    leg.upper.translate(0, 0, -leg.upper.size.z);
-
-    leg.middle = new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0));
-    leg.middle.translate(0, 0, -leg.middle.size.z);
-    leg.middle.rotateAxis(new THREE.Vector3(1, 0, 0), -2*Math.PI / 8);
-
-    leg.lower = new Foot(mass, new THREE.Vector3(0.2, 0.2, 1.0));
-    leg.lower.translate(0, 0, -leg.lower.size.z);
-    leg.lower.rotateAxis(new THREE.Vector3(1, 0, 0), 2*Math.PI / 8);
-
-    return leg;
-  }
-
-  respectJoints = function(leg, legPoint, trunk, trunkPoint) {
-    leg.upper.snapTo(legPoint, trunk, trunkPoint);
-
-    leg.middle.snapTo(new THREE.Vector3(0, 0, leg.middle.size.z), 
-                      leg.upper, 
-                      new THREE.Vector3(0, 0, -leg.upper.size.z));
-
-    leg.lower.snapTo(new THREE.Vector3(0, 0, leg.lower.size.z), 
-                     leg.middle, 
-                     new THREE.Vector3(0, 0, -leg.middle.size.z));
-  }
   
   initScene = function() {
     scene = new THREE.Scene();
@@ -247,111 +154,48 @@
     trunk.buildAndInsert(scene);
     scene.camera.target = trunk;
 
-    var legs = [];
-    var legFL = createFrontLeg(mass);
-    legFL.upper.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 8);
-    legFL.middle.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 8 + Math.PI / 16);
-    legFL.lower.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 4);
-    respectJoints(legFL, 
-                  new THREE.Vector3(0, 0, legFL.upper.size.z),
-                  trunk, 
-                  new THREE.Vector3(-trunk.size.x, trunk.size.y, -trunk.size.z));
-    legs.push(legFL);
+    var legFL = new FrontLeg(trunk, 
+                             new THREE.Vector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
+                             [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                              new Foot(mass, new THREE.Vector3(0.2, 0.2, 0.5))]);
 
-    var legFR = createFrontLeg(mass);
-    legFR.upper.rotateAxis(new THREE.Vector3(1, 0, 0), -Math.PI / 8);
-    legFR.middle.rotateAxis(new THREE.Vector3(1, 0, 0), -Math.PI / 8);
-    respectJoints(legFR, 
-                  new THREE.Vector3(0, 0, legFL.upper.size.z),
-                  trunk, 
-                  new THREE.Vector3(trunk.size.x, trunk.size.y, -trunk.size.z));
-    legs.push(legFR);
+    var legFR = new FrontLeg(trunk, 
+                             new THREE.Vector3(trunk.size.x, trunk.size.y, -trunk.size.z),
+                             [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                              new Foot(mass, new THREE.Vector3(0.2, 0.2, 0.5))]);
 
-    var legRL = createBackLeg(mass);
-    respectJoints(legRL, 
-                  new THREE.Vector3(0, 0, legFL.upper.size.z),
-                  trunk, 
-                  new THREE.Vector3(-trunk.size.x, -trunk.size.y, -trunk.size.z));
-    legs.push(legRL);
+    var legRL = new RearLeg(trunk, 
+                            new THREE.Vector3(trunk.size.x, -trunk.size.y, -trunk.size.z),
+                            [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                             new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                             new Foot(mass, new THREE.Vector3(0.2, 0.2, 1.0))]);
 
-    var legRR = createBackLeg(mass);
-    legRR.upper.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI / 8);
-    respectJoints(legRR, 
-                  new THREE.Vector3(0, 0, legFL.upper.size.z),
-                  trunk, 
-                  new THREE.Vector3(trunk.size.x, -trunk.size.y, -trunk.size.z));
-    legs.push(legRR);
+    var legRR = new RearLeg(trunk, 
+                            new THREE.Vector3(-trunk.size.x, -trunk.size.y, -trunk.size.z),
+                            [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                             new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                             new Foot(mass, new THREE.Vector3(0.2, 0.2, 1.0))]);
 
-    // Constrain legs
-    var joints = [];
+    var legs = [legFL, legFR, legRL, legRR];
     legs.forEach(function(leg) {
-      leg.upper.buildAndInsert(scene);
-      leg.middle.buildAndInsert(scene);
-      leg.lower.buildAndInsert(scene);
-
-      joints.push(new Joint(leg.upper,
-                            new THREE.Vector3(0, 0, -leg.upper.size.z),
-                            leg.middle,
-                            new THREE.Vector3(0, 0, leg.middle.size.z)));
-
-      joints.push(new Joint(leg.middle,
-                            new THREE.Vector3(0, 0, -leg.middle.size.z),
-                            leg.lower,
-                            new THREE.Vector3(0, 0, leg.lower.size.z)));
+      leg.buildAndInsert(scene);
     });
 
-    joints.push(new Joint(trunk, 
-                          new THREE.Vector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
-                          legFL.upper,
-                          new THREE.Vector3(0, 0, legFL.upper.size.z)));
-    joints.push(new Joint(trunk, 
-                          new THREE.Vector3(trunk.size.x, trunk.size.y, -trunk.size.z),
-                          legFR.upper,
-                          new THREE.Vector3(0, 0, legFR.upper.size.z)));
-    joints.push(new Joint(trunk, 
-                          new THREE.Vector3(-trunk.size.x, -trunk.size.y, -trunk.size.z),
-                          legRL.upper,
-                          new THREE.Vector3(0, 0, legRL.upper.size.z)));
-    joints.push(new Joint(trunk, 
-                          new THREE.Vector3(trunk.size.x, -trunk.size.y, -trunk.size.z),
-                          legRR.upper,
-                          new THREE.Vector3(0, 0, legRR.upper.size.z)));
-
     /* sets a callback for updating the torques on the joints */
-    scene.showMuscles = false;
-    var time = 0;
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
-      time += timeStep;
       scene.world.clearForces();
       scene.world.bodies.forEach( function(b) {
         b.body.applyGravity();
       } );
 
-      var q1 = [];
-      var q2 = [];
-      ikSolve(q1, q2,
-              [2*legRL.upper.size.z,
-               2*legRL.middle.size.z,
-               2*legRL.lower.size.z],
-              [0, -4.5 + 0.5*Math.sin(time), -Math.PI/8 + 0.1*Math.sin(time)]);
-      joints[10].targetAngle = q1[0]; 
-      joints[4].targetAngle = q1[1]; 
-      joints[5].targetAngle = q1[2];
-
-      joints[11].targetAngle = q2[0]; 
-      joints[6].targetAngle = q2[1]; 
-      joints[7].targetAngle = q2[2];
-
-      joints.forEach(function(joint) {
-        joint.update();
+      legs.forEach(function(leg) {
+        leg.update(timeStep);
       });
     });
 
     scene.world.setInternalTickCallback(fp, undefined, true);
-
-    for(var i=0; i<joints.length; i++) {
-      joints[i].buildAndInsert(scene);
-    }
 
     animate();
   };
