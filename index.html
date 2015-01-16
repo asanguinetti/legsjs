@@ -92,13 +92,17 @@
 
   /**
    * Solves a planar inverse kinematic problem with 3 links and 3 rotational joints.
-   * \param list q List of target joint angles starting from the closest to the base.
+   * \param list q1 List of target joint angles starting from the closest to the 
+   *                base (1st solution).
+   * \param list q2 List of target joint angles starting from the closest to the 
+   *                base (2nd solution).
    * \param list l List of link lengths conforming the chain, starting from 
    *               the closest to the base.
    * \param list p End-effector position and orientation.
    * \return list List of joint angles starting from the closest to the base.
    */
-  ikSolve = function(q, l, p) {
+  ikSolve = function(q1, q2, l, p) {
+    /* TODO: make a "best effort" in case there is no solution */
     var w = [];
 
     /* gets the position and angle of the wrist from the following equations.
@@ -115,21 +119,22 @@
      * q_2 = PI - beta
      * l_1^2 + l_2^2 - 2*l_1*l_2*cos(beta) = w_x^2 + w_y^2
      */
-    q[1] = Math.PI - Math.acos((l[0]*l[0] + l[1]*l[1] - w[0]*w[0] - w[1]*w[1])/(2*l[0]*l[1]));
+    q1[1] = Math.PI - Math.acos((l[0]*l[0] + l[1]*l[1] - w[0]*w[0] - w[1]*w[1])/(2*l[0]*l[1]));
+    q2[1] = -q1[1]
 
 
     /* similarly:
      * q_1 = alpha - gamma
      * l_1^2 + w_x^2 + w_y^2 - 2*l_1*sqrt(w_x^2 + w_y^2)*cos(gamma) = l_2^2
      */
-     q[0] = w[2] - Math.acos((l[0]*l[0] - l[1]*l[1] + w[0]*w[0] + w[1]*w[1])/(2*l[0]*Math.sqrt(w[0]*w[0] + w[1]*w[1])));
+     q1[0] = w[2] - Math.acos((l[0]*l[0] - l[1]*l[1] + w[0]*w[0] + w[1]*w[1])/(2*l[0]*Math.sqrt(w[0]*w[0] + w[1]*w[1])));
+     q2[0] = 2*w[2] - q1[0];
 
      /* finally:
       * q_3 = phi - q_2 - q_1
       */
-     q[2] = p[2] - q[1] - q[0];
-
-     return q;
+     q1[2] = p[2] - q1[1] - q1[0];
+     q2[2] = p[2] - q2[1] - q2[0];
   };
 
   createFrontLeg = function(mass) {
@@ -414,15 +419,20 @@
         b.body.applyGravity();
       } );
 
-      var q = [];
-      ikSolve(q,
+      var q1 = [];
+      var q2 = [];
+      ikSolve(q1, q2,
               [2*legRL.upper.size.z,
                2*legRL.middle.size.z,
                2*legRL.lower.size.z],
               [0, -4.5 + 0.5*Math.sin(time), -Math.PI/8 + 0.1*Math.sin(time)]);
-      joints[10].targetAngle = q[0]; 
-      joints[4].targetAngle = q[1]; 
-      joints[5].targetAngle = q[2];
+      joints[10].targetAngle = q1[0]; 
+      joints[4].targetAngle = q1[1]; 
+      joints[5].targetAngle = q1[2];
+
+      joints[11].targetAngle = q2[0]; 
+      joints[6].targetAngle = q2[1]; 
+      joints[7].targetAngle = q2[2];
 
       joints.forEach(function(joint) {
         joint.update();
