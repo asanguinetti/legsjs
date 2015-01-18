@@ -15,6 +15,12 @@ var three2BulletTransform = function(threeT, bulletT) {
   return t;
 };
 
+var extend = function(extended, base) {
+  extended.prototype = base.prototype;
+  extended.prototype.base = base;
+  extended.prototype.constructor = extended;
+};
+
 /**
  * Solves a planar inverse kinematic problem with 3 links and 3 rotational joints.
  * \param list q1 List of target joint angles starting from the closest to the 
@@ -68,6 +74,69 @@ var CollisionGroup = {
   GROUND: 2,
   MUSCLE: 4
 }
+
+var Gait = function(phase) {
+  this.phase = phase;
+  /* FIXME: strike and take off positions are inverted */
+  this.swingCycle = 0.4;
+  this.period = 3;
+  this.targeFootPos = [0, 0, -Math.PI/8];
+  this.time = this.phase * this.period;
+  this.normalizedTime = this.phase;
+};
+
+Gait.prototype.update = function(timeStep) {
+  this.time += timeStep;
+  this.time %= this.period;
+  this.normalizedTime = this.time / this.period;
+  if(this.normalizedTime < this.swingCycle) {
+    /* renormalizes the time for the swing cycle */
+    this.normalizedTime /= this.swingCycle;
+    /* linear interpolation between take off and strike positions */
+    this.targeFootPos[0] = this.normalizedTime*this.strikePosition + 
+                           (1 - this.normalizedTime)*this.takeOffPosition;
+    /* height uses an inverse parabola with roots at 0 and 1 */
+    this.targeFootPos[1] = (this.maxSwingHeight*27/4)*this.normalizedTime*this.normalizedTime*(1 - this.normalizedTime) - this.stanceHeight;
+    /* linear interpolation between take off and strike angles */
+    this.targeFootPos[2] = this.normalizedTime*this.strikeAngle + 
+                           (1 - this.normalizedTime)*this.takeOffAngle;
+  } else {
+    /* renormalizes the time for the stance cycle */
+    this.normalizedTime = (this.normalizedTime - this.swingCycle)/(1 - this.swingCycle);
+    /* linear interpolation between strike and take off positions */
+    this.targeFootPos[0] = this.normalizedTime*this.takeOffPosition + 
+                           (1 - this.normalizedTime)*this.strikePosition;
+    /* height uses an inverse parabola with roots at 0 and 1 */
+    this.targeFootPos[1] = -this.stanceHeight;
+    /* linear interpolation between strike and take off angles */
+    this.targeFootPos[2] = this.normalizedTime*this.takeOffAngle + 
+                           (1 - this.normalizedTime)*this.strikeAngle;
+  }
+}
+
+var FrontLegGait = function(phase) {
+  this.base.call(this, phase);
+  this.strikePosition = 1;
+  this.takeOffPosition = -1;
+  this.strikeAngle = Math.PI/4;
+  this.takeOffAngle = -Math.PI/4;
+  this.maxSwingHeight = 1;
+  this.stanceHeight = 4.5;
+};
+
+extend(FrontLegGait, Gait);
+
+var RearLegGait = function(phase) {
+  this.base.call(this, phase);
+  this.strikePosition = 1;
+  this.takeOffPosition = -3;
+  this.strikeAngle = Math.PI/4;
+  this.takeOffAngle = -Math.PI/4;
+  this.maxSwingHeight = 1;
+  this.stanceHeight = 4;
+};
+
+extend(RearLegGait, Gait);
 
 var RigidBody = function(mass, size) {
   this.mass = mass;
@@ -396,20 +465,20 @@ Joint.prototype.update = function() {
   var jointAxis = new Ammo.btVector3(this.c.getAxis(0));
 
   /* calculates the relative angular velocity of the two objects */
-  var deltaOmega = new Ammo.btVector3(this.bodyA.body.getAngularVelocity());
-  deltaOmega.op_sub(this.bodyB.body.getAngularVelocity())
+  var deltaOmega = new Ammo.btVector3(this.bodyB.body.getAngularVelocity());
+  deltaOmega.op_sub(this.bodyA.body.getAngularVelocity())
 
   /* calculates the projection of the relative angular velocity along the joint axis */
   var jointVel = deltaOmega.dot(jointAxis);
 
   /* calculates the torque to apply using PD */
-  var torqueScalar = 2000*(this.targetAngle - this.c.getAngle(0)) + 60*(0 - jointVel);
+  var torqueScalar = 2000*(this.targetAngle + this.c.getAngle(0)) + 60*(0 - jointVel);
 
   /* applies the equal and opposite torques to both objects */
   jointAxis.op_mul(torqueScalar);
-  this.bodyA.body.applyTorque(jointAxis);
-  jointAxis.op_mul(-1);
   this.bodyB.body.applyTorque(jointAxis);
+  jointAxis.op_mul(-1);
+  this.bodyA.body.applyTorque(jointAxis);
 }
 
 Joint.prototype.buildAndInsert = function(scene) {
@@ -435,10 +504,11 @@ Joint.prototype.buildAndInsert = function(scene) {
   scene.world.addConstraint(this.c, true);
 };
 
-var Leg = function(trunk, pivot, segments) {
+var Leg = function(trunk, pivot, segments, gait) {
   this.trunk = trunk;
   this.pivot = pivot;
   this.segments = segments;
+  this.gait = gait;
   this.joints = [];
   this.time = 0;
   this.q1 = [];
@@ -482,12 +552,12 @@ Leg.prototype.buildAndInsert = function(scene) {
 };
 
 Leg.prototype.update = function(timeStep) {
-  this.time += timeStep;
+  this.gait.update(timeStep);
   ikSolve(this.q1, this.q2,
           [2*this.segments[0].size.z,
            2*this.segments[1].size.z,
            2*this.segments[2].size.z],
-          [0, -4 + 0.5*Math.sin(this.time), -Math.PI/8 + 0.1*Math.sin(this.time)]);
+          this.gait.targeFootPos);
 
   for(var i = 0; i < this.joints.length; i++) {
     this.joints[i].targetAngle = this.q[i];
@@ -495,18 +565,18 @@ Leg.prototype.update = function(timeStep) {
   };
 };
 
-var FrontLeg = function(trunk, pivot, segments) {
-  this.base.call(this, trunk, pivot, segments);
-  this.q = this.q2;
+var FrontLeg = function(trunk, pivot, segments, gait) {
+  this.base.call(this, trunk, pivot, segments, gait);
+  this.q = this.q1;
 };
 
 FrontLeg.prototype = Leg.prototype;
 FrontLeg.prototype.base = Leg;
 FrontLeg.prototype.constructor = FrontLeg;
 
-var RearLeg = function(trunk, pivot, segments) {
-  this.base.call(this, trunk, pivot, segments);
-  this.q = this.q1;
+var RearLeg = function(trunk, pivot, segments, gait) {
+  this.base.call(this, trunk, pivot, segments, gait);
+  this.q = this.q2;
 };
 
 RearLeg.prototype = Leg.prototype;
