@@ -33,7 +33,6 @@ var extend = function(extended, base) {
  * \return list List of joint angles starting from the closest to the base.
  */
 var ikSolve = function(q1, q2, l, p) {
-  /* TODO: make a "best effort" in case there is no solution */
   var w = [];
 
   /* gets the position and angle of the wrist from the following equations.
@@ -45,12 +44,17 @@ var ikSolve = function(q1, q2, l, p) {
   w[1] = p[1] + l[2]*Math.cos(p[2]);
   w[2] = Math.atan2(w[0], -w[1]);
 
+  /* gets the squared length of the wrist's position vector because it is used
+   * many times later
+   * we also cap it to the squared length of the arm */
+  w[3] = Math.min(w[0]*w[0] + w[1]*w[1], Math.pow(l[0] + l[1], 2));
+
   /* gets q_2 as the supplement of beta which is itself calculated from the
    * cosine theorem 
    * q_2 = PI - beta
    * l_1^2 + l_2^2 - 2*l_1*l_2*cos(beta) = w_x^2 + w_y^2
    */
-  q1[1] = Math.PI - Math.acos((l[0]*l[0] + l[1]*l[1] - w[0]*w[0] - w[1]*w[1])/(2*l[0]*l[1]));
+  q1[1] = Math.PI - Math.acos((l[0]*l[0] + l[1]*l[1] - w[3])/(2*l[0]*l[1]));
   q2[1] = -q1[1]
 
 
@@ -58,7 +62,7 @@ var ikSolve = function(q1, q2, l, p) {
    * q_1 = alpha - gamma
    * l_1^2 + w_x^2 + w_y^2 - 2*l_1*sqrt(w_x^2 + w_y^2)*cos(gamma) = l_2^2
    */
-   q1[0] = w[2] - Math.acos((l[0]*l[0] - l[1]*l[1] + w[0]*w[0] + w[1]*w[1])/(2*l[0]*Math.sqrt(w[0]*w[0] + w[1]*w[1])));
+   q1[0] = w[2] - Math.acos((l[0]*l[0] - l[1]*l[1] + w[3])/(2*l[0]*Math.sqrt(w[3])));
    q2[0] = 2*w[2] - q1[0];
 
    /* finally:
