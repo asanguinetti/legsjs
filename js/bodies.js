@@ -254,11 +254,12 @@ Bone.prototype.buildVisual = function() {
 
 var Foot = function(mass, size) {
   this.base.call(this, mass, size);
-  this.heel = new Bone(mass, size);
-  this.forefoot = new Bone(mass, new THREE.Vector3(0.2, 0.2, 0.2));
+  this.heel = new Bone(mass, new THREE.Vector3(size.x, size.y, size.z - size.x));
+  this.heel.translate(0, 0, size.x);
+  this.forefoot = new Bone(mass, new THREE.Vector3(size.x, size.x, size.x));
   this.forefoot.snapTo(new THREE.Vector3(0, 0, 0),
                        this.heel,
-                       new THREE.Vector3(0, 0, -size.z - size.x));
+                       new THREE.Vector3(0, 0, -this.heel.size.z - this.forefoot.size.x));
   this.collisionGroup = CollisionGroup.BONE;
 };
 

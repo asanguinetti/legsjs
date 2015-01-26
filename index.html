@@ -158,28 +158,28 @@
                              new THREE.Vector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
                              [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                               new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                              new Foot(mass, new THREE.Vector3(0.2, 0.2, 0.5))],
+                              new Foot(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
                              new FrontLegGait(0.9));
 
     var legFR = new FrontLeg(trunk, 
                              new THREE.Vector3(trunk.size.x, trunk.size.y, -trunk.size.z),
                              [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                               new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                              new Foot(mass, new THREE.Vector3(0.2, 0.2, 0.5))],
+                              new Foot(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
                              new FrontLegGait(0.3));
 
     var legRL = new RearLeg(trunk, 
                             new THREE.Vector3(-trunk.size.x, -trunk.size.y, -trunk.size.z),
                             [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                             new Foot(mass, new THREE.Vector3(0.2, 0.2, 1.0))],
+                             new Foot(mass, new THREE.Vector3(0.2, 0.2, 1.2))],
                             new RearLegGait(0.6));
 
     var legRR = new RearLeg(trunk, 
                             new THREE.Vector3(trunk.size.x, -trunk.size.y, -trunk.size.z),
                             [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                             new Foot(mass, new THREE.Vector3(0.2, 0.2, 1.0))],
+                             new Foot(mass, new THREE.Vector3(0.2, 0.2, 1.2))],
                             new RearLegGait(0));
 
     var legs = [legFL, legFR, legRL, legRR];
