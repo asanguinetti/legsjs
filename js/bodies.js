@@ -15,6 +15,26 @@ var three2BulletTransform = function(threeT, bulletT) {
   return t;
 };
 
+var bullet2ThreeTransform = function(bulletT, threeT) {
+  t = threeT
+  if(threeT === undefined)
+    t = new THREE.Matrix4();
+
+  var p = new THREE.Vector3(bulletT.getOrigin().x(), 
+                            bulletT.getOrigin().y(), 
+                            bulletT.getOrigin().z());
+  var q = new THREE.Quaternion(bulletT.getRotation().x(), 
+                               bulletT.getRotation().y(), 
+                               bulletT.getRotation().z(), 
+                               bulletT.getRotation().w());
+
+  t.identity();
+  t.makeRotationFromQuaternion(q);
+  t.setPosition(p);
+
+  return t;
+};
+
 var extend = function(extended, base) {
   extended.prototype = base.prototype;
   extended.prototype.base = base;
@@ -163,6 +183,26 @@ RigidBody.prototype.rotateAxis = function(axis, theta, pivot) {
   this.transform.multiplyMatrices(this.transformAux, this.transform);
   if(pivot !== undefined)
     this.translate(pivot.x, pivot.y, pivot.z);
+};
+
+RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
+  var mat4 = new THREE.Matrix4();
+  
+  var p = worldPoint;
+  if(worldPoint === undefined)
+    p = new THREE.Vector3();
+
+  var t = this.btTransform;
+  if(this.body !== undefined)
+  {
+    t = this.btTransformAux;
+    this.body.getMotionState().getWorldTransform(t);
+  }
+  bullet2ThreeTransform(t, mat4);
+
+  p.applyMatrix4(mat4);
+
+  return p;
 };
 
 RigidBody.prototype.snapTo = function(snapPoint, bodyB, snapPointB) {
@@ -465,8 +505,14 @@ var Joint = function(bodyA, pivotInA, bodyB, pivotInB) {
   this.targetAngle = 0;
 };
 
+Joint.prototype.getPosition = function() {
+  var pivotWorldA = this.bodyA.toWorldFrame(this.pivotInA);
+  var pivotWorldB = this.bodyB.toWorldFrame(this.pivotInB);
+  pivotWorldA.lerp(pivotWorldB, 0.5);
+  return pivotWorldA;
+};
+
 Joint.prototype.update = function() {
-  /* TODO: the target angle should be a function of time */
   var jointAxis = new Ammo.btVector3(this.c.getAxis(0));
 
   /* calculates the relative angular velocity of the two objects */
@@ -484,7 +530,7 @@ Joint.prototype.update = function() {
   this.bodyB.body.applyTorque(jointAxis);
   jointAxis.op_mul(-1);
   this.bodyA.body.applyTorque(jointAxis);
-}
+};
 
 Joint.prototype.buildAndInsert = function(scene) {
   var frameInA = new Ammo.btTransform();
