@@ -205,6 +205,35 @@ RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
   return p;
 };
 
+RigidBody.prototype.getLinearVelocity = function(localPoint) {
+  var vel = this.body.getLinearVelocity();
+
+  if(localPoint !== undefined) {
+    var lp = new Ammo.btVector3(localPoint.x, 
+                                localPoint.y, 
+                                localPoint.z);
+    vel.op_add(this.body.getAngularVelocity().cross(lp));
+  }
+
+  return new THREE.Vector3(vel.x(), vel.y(), vel.z());
+};
+
+RigidBody.prototype.getEulerRotation = function() {
+  var mat4 = new THREE.Matrix4();
+
+  var t = this.btTransform;
+  if(this.body !== undefined)
+  {
+    t = this.btTransformAux;
+    this.body.getMotionState().getWorldTransform(t);
+  }
+  bullet2ThreeTransform(t, mat4);
+
+  var euler = new THREE.Euler();
+  euler.setFromRotationMatrix(mat4, 'XYZ');
+  return euler.toVector3();
+};
+
 RigidBody.prototype.snapTo = function(snapPoint, bodyB, snapPointB) {
   /* converts the local snap point of this object to world frame */
   var worldSnapPoint = new THREE.Vector4(snapPoint.x, 
@@ -497,12 +526,14 @@ Trunk.prototype.buildVisual = function() {
 };
 
 var Joint = function(bodyA, pivotInA, bodyB, pivotInB) {
-  /* TODO: add support for setting the joint axis */
   this.bodyA = bodyA;
   this.bodyB = bodyB;
   this.pivotInA = pivotInA;
   this.pivotInB = pivotInB;
   this.targetAngle = 0;
+
+  /* TODO: add support for setting the joint axis */
+  this.axis = new THREE.Vector3(1, 0, 0);
 };
 
 Joint.prototype.getPosition = function() {
@@ -512,7 +543,22 @@ Joint.prototype.getPosition = function() {
   return pivotWorldA;
 };
 
-Joint.prototype.update = function() {
+Joint.prototype.getAxis = function() {
+  var axis = this.c.getAxis(0);
+  this.axis.set(axis.x(), axis.y(), axis.z());
+  return this.axis;
+};
+
+Joint.prototype.getTorqueForVirtualForce = function(point, force) {
+  // torque = (axis x (point - anchor)) * force
+  var a = this.getAxis();
+  var b = this.getPosition();
+  b.subVectors(point, b);
+  b.crossVectors(a, b);
+  return b.dot(force);
+};
+
+Joint.prototype.update = function(extraTorque) {
   var jointAxis = new Ammo.btVector3(this.c.getAxis(0));
 
   /* calculates the relative angular velocity of the two objects */
@@ -524,6 +570,7 @@ Joint.prototype.update = function() {
 
   /* calculates the torque to apply using PD */
   var torqueScalar = 2000*(this.targetAngle + this.c.getAngle(0)) + 60*(0 - jointVel);
+  torqueScalar += extraTorque;
 
   /* applies the equal and opposite torques to both objects */
   jointAxis.op_mul(torqueScalar);
@@ -549,6 +596,8 @@ Joint.prototype.buildAndInsert = function(scene) {
                                             frameInA, 
                                             frameInB, 
                                             true);
+
+  /* TODO: add support for setting the joint axis */
   this.c.setAngularLowerLimit(new Ammo.btVector3(1, 0, 0));
   this.c.setAngularUpperLimit(new Ammo.btVector3(0, 0, 0));
 
@@ -610,9 +659,14 @@ Leg.prototype.update = function(timeStep) {
            2*this.segments[2].size.z],
           this.gait.targeFootPos);
 
+  /* calculates the force to help keeping the hip and shoulders height */
+  var pivotPosWorld = this.trunk.toWorldFrame(this.pivot);
+  var pivotVelWorld = this.trunk.getLinearVelocity(this.pivot);
+  var force = new THREE.Vector3(0, 0, -5*(this.gait.stanceHeight - pivotPosWorld.z) - 5*(0 - pivotVelWorld.z));
+
   for(var i = 0; i < this.joints.length; i++) {
     this.joints[i].targetAngle = this.q[i];
-    this.joints[i].update();
+    this.joints[i].update(this.joints[i].getTorqueForVirtualForce(pivotPosWorld, force));
   };
 };
 
