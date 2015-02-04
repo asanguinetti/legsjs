@@ -103,7 +103,7 @@ var Gait = function(phase) {
   this.phase = phase;
   /* FIXME: strike and take off positions are inverted */
   this.swingCycle = 0.4;
-  this.period = 3;
+  this.period = 1.2;
   this.targeFootPos = [0, 0, -Math.PI/8];
   this.time = this.phase * this.period;
   this.normalizedTime = this.phase;
