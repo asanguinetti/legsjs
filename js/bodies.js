@@ -608,6 +608,7 @@ var Leg = function(trunk, pivot, segments, gait) {
   this.trunk = trunk;
   this.pivot = pivot;
   this.segments = segments;
+  this.standing = false;
   this.gait = gait;
   this.joints = [];
   this.time = 0;
@@ -665,8 +666,11 @@ Leg.prototype.update = function(timeStep) {
   var force = new THREE.Vector3(0, 0, -5*(this.gait.stanceHeight - pivotPosWorld.z) - 5*(0 - pivotVelWorld.z));
 
   for(var i = 0; i < this.joints.length; i++) {
+    var balanceTorque = 0;
+    if(this.standing)
+      balanceTorque = this.joints[i].getTorqueForVirtualForce(pivotPosWorld, force);
     this.joints[i].targetAngle = this.q[i];
-    this.joints[i].update(this.joints[i].getTorqueForVirtualForce(pivotPosWorld, force));
+    this.joints[i].update(balanceTorque);
   };
 };
 

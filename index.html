@@ -194,8 +194,35 @@
         b.body.applyGravity();
       } );
 
+      /* iterates over the contact manifolds to check if any leg is touching the ground */
+      var numManifolds = scene.world.getDispatcher().getNumManifolds();
+      for(var i = 0; i < numManifolds; i++) {
+          var contactManifold =  scene.world.getDispatcher().getManifoldByIndexInternal(i);
+          var obA = contactManifold.getBody0();
+          var obB = contactManifold.getBody1();
+          var legSegment;
+
+          /* finds if any of the two objects is the ground */
+          if(Ammo.compare(obA, ground.body))
+            legSegment = obB;
+          else if(Ammo.compare(obB, ground.body))
+            legSegment = obA;
+          else
+            continue;
+
+          /* finds if any of the feet is the other object */
+          legs.forEach(function(leg) {
+            if(Ammo.compare(leg.segments[leg.segments.length - 1].body, legSegment))
+            {
+              leg.standing = true;
+              return false;
+            }
+          });
+      }
+
       legs.forEach(function(leg) {
         leg.update(timeStep);
+        leg.standing = false;
       });
     });
 
