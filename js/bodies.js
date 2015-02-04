@@ -413,10 +413,19 @@ Ground.prototype.buildRigidBody = function() {
 };
 
 Ground.prototype.buildVisual = function() {
-  var mesh = new THREE.Mesh(new THREE.BoxGeometry(2*this.size.x, 2*this.size.y, 2*this.size.z), 
+  var mesh = new THREE.Mesh(new THREE.BoxGeometry(2*this.size.x, 2*this.size.y, 2*this.size.z, 99, 99), 
                             new THREE.MeshLambertMaterial({color: 0xeeeeee}));
   mesh.receiveShadow = true;
   mesh.castShadow = false;
+  var lightColor = new THREE.Color(0xcccccc);
+  var darkColor = new THREE.Color(0xaaaaaa);
+  for(var i = 0; i < mesh.geometry.faces.length; i++) {
+    var color = Math.floor(i / 2) % 2 ? lightColor : darkColor;
+    mesh.geometry.faces[i].vertexColors[0] = color;
+    mesh.geometry.faces[i].vertexColors[1] = color;
+    mesh.geometry.faces[i].vertexColors[2] = color;
+  }
+  mesh.material.vertexColors = THREE.VertexColors;
 
   this.visual = new THREE.Object3D();
   this.visual.add(mesh);
