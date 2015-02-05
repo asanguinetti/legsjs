@@ -104,6 +104,7 @@ var Gait = function(phase) {
   /* FIXME: strike and take off positions are inverted */
   this.swingCycle = 0.4;
   this.period = 1.2;
+  this.velocity = 14;
   this.targeFootPos = [0, 0, -Math.PI/8];
   this.time = this.phase * this.period;
   this.normalizedTime = this.phase;
@@ -114,6 +115,7 @@ Gait.prototype.update = function(timeStep) {
   this.time %= this.period;
   this.normalizedTime = this.time / this.period;
   if(this.normalizedTime < this.swingCycle) {
+    /* TODO: the strike position should include a velocity factor */
     /* renormalizes the time for the swing cycle */
     this.normalizedTime /= this.swingCycle;
     /* linear interpolation between take off and strike positions */
@@ -672,12 +674,19 @@ Leg.prototype.update = function(timeStep) {
   /* calculates the force to help keeping the hip and shoulders height */
   var pivotPosWorld = this.trunk.toWorldFrame(this.pivot);
   var pivotVelWorld = this.trunk.getLinearVelocity(this.pivot);
-  var force = new THREE.Vector3(0, 0, -5*(this.gait.stanceHeight - pivotPosWorld.z) - 5*(0 - pivotVelWorld.z));
+  var fh = new THREE.Vector3(0, 0, -5*(this.gait.stanceHeight - pivotPosWorld.z) - 5*(0 - pivotVelWorld.z));
+
+  var zero = new THREE.Vector3(0, 0, 0)
+  var trunkCenterVel = this.trunk.getLinearVelocity(zero);
+  var trunkCenterPos = this.trunk.toWorldFrame(zero);
+  var fv = new THREE.Vector3(0, 5*(this.gait.velocity - trunkCenterVel.y), 0);
 
   for(var i = 0; i < this.joints.length; i++) {
     var balanceTorque = 0;
-    if(this.standing)
-      balanceTorque = this.joints[i].getTorqueForVirtualForce(pivotPosWorld, force);
+    if(this.standing) {
+      balanceTorque += this.joints[i].getTorqueForVirtualForce(pivotPosWorld, fh);
+      balanceTorque += this.joints[i].getTorqueForVirtualForce(trunkCenterPos, fv);
+    }
     this.joints[i].targetAngle = this.q[i];
     this.joints[i].update(balanceTorque);
   };
