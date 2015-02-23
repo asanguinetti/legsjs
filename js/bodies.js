@@ -536,15 +536,20 @@ Trunk.prototype.buildVisual = function() {
   this.visual = visual;
 };
 
-var Joint = function(bodyA, pivotInA, bodyB, pivotInB) {
+var Joint = function(bodyA, pivotInA, bodyB, pivotInB, angularLowerLimit, angularUpperLimit) {
   this.bodyA = bodyA;
   this.bodyB = bodyB;
   this.pivotInA = pivotInA;
   this.pivotInB = pivotInB;
-  this.targetAngle = 0;
+  this.targetAngle = [0, 0, 0];
+
+  this.angularLowerLimit = angularLowerLimit;
+  this.angularUpperLimit = angularUpperLimit;
 
   /* TODO: add support for setting the joint axis */
-  this.axis = new THREE.Vector3(1, 0, 0);
+  this.axis = [new THREE.Vector3(1, 0, 0), 
+               new THREE.Vector3(0, 1, 0),
+               new THREE.Vector3(0, 0, 1)];
 };
 
 Joint.prototype.getPosition = function() {
@@ -555,39 +560,51 @@ Joint.prototype.getPosition = function() {
 };
 
 Joint.prototype.getAxis = function() {
-  var axis = this.c.getAxis(0);
-  this.axis.set(axis.x(), axis.y(), axis.z());
+  var axis;
+  for(var i = 0; i < 3; i++) {
+    axis = this.c.getAxis(i);
+    this.axis[i].set(axis.x(), axis.y(), axis.z());
+  }
   return this.axis;
 };
 
 Joint.prototype.getTorqueForVirtualForce = function(point, force) {
   // torque = (axis x (point - anchor)) * force
   var a = this.getAxis();
-  var b = this.getPosition();
-  b.subVectors(point, b);
-  b.crossVectors(a, b);
-  return b.dot(force);
+  var b;
+  var torque = new THREE.Vector3();
+  for(var i = 0; i < a.length; i++) {
+    if(this.angularLowerLimit.getComponent(i) > this.angularUpperLimit.getComponent(i)) {
+      b = this.getPosition();
+      b.subVectors(point, b);
+      b.crossVectors(a[i], b);
+      torque.setComponent(i, b.dot(force));
+    }
+  }
+  return torque;
 };
 
 Joint.prototype.update = function(extraTorque) {
-  var jointAxis = new Ammo.btVector3(this.c.getAxis(0));
+  for(var i = 0; i < 3; i++) {
+    var jointAxis = new Ammo.btVector3(this.c.getAxis(i));
 
-  /* calculates the relative angular velocity of the two objects */
-  var deltaOmega = new Ammo.btVector3(this.bodyB.body.getAngularVelocity());
-  deltaOmega.op_sub(this.bodyA.body.getAngularVelocity())
+    /* calculates the relative angular velocity of the two objects */
+    var deltaOmega = new Ammo.btVector3(this.bodyB.body.getAngularVelocity());
+    deltaOmega.op_sub(this.bodyA.body.getAngularVelocity())
 
-  /* calculates the projection of the relative angular velocity along the joint axis */
-  var jointVel = deltaOmega.dot(jointAxis);
+    /* calculates the projection of the relative angular velocity along the joint axis */
+    var jointVel = deltaOmega.dot(jointAxis);
 
-  /* calculates the torque to apply using PD */
-  var torqueScalar = 2000*(this.targetAngle + this.c.getAngle(0)) + 60*(0 - jointVel);
-  torqueScalar += extraTorque;
+    /* calculates the torque to apply using PD */
+    var torqueScalar = 2000*(this.targetAngle[i] + this.c.getAngle(i)) + 60*(0 - jointVel);
+    torqueScalar += extraTorque.getComponent(i);
 
-  /* applies the equal and opposite torques to both objects */
-  jointAxis.op_mul(torqueScalar);
-  this.bodyB.body.applyTorque(jointAxis);
-  jointAxis.op_mul(-1);
-  this.bodyA.body.applyTorque(jointAxis);
+    /* applies the equal and opposite torques to both objects */
+    jointAxis.op_mul(torqueScalar);
+    this.bodyB.body.applyTorque(jointAxis);
+    jointAxis.op_mul(-1);
+    this.bodyA.body.applyTorque(jointAxis);
+  }
 };
 
 Joint.prototype.buildAndInsert = function(scene) {
@@ -609,8 +626,12 @@ Joint.prototype.buildAndInsert = function(scene) {
                                             true);
 
   /* TODO: add support for setting the joint axis */
-  this.c.setAngularLowerLimit(new Ammo.btVector3(1, 0, 0));
-  this.c.setAngularUpperLimit(new Ammo.btVector3(0, 0, 0));
+  this.c.setAngularLowerLimit(new Ammo.btVector3(this.angularLowerLimit.x,
+                                                 this.angularLowerLimit.y,
+                                                 this.angularLowerLimit.z));
+  this.c.setAngularUpperLimit(new Ammo.btVector3(this.angularUpperLimit.x,
+                                                 this.angularUpperLimit.y,
+                                                 this.angularUpperLimit.z));
 
   scene.world.addConstraint(this.c, true);
 };
@@ -634,7 +655,9 @@ var Leg = function(trunk, pivot, segments, gait) {
       new Joint(trunk,
                 pivot,
                 segments[0],
-                new THREE.Vector3(0, 0, segments[0].size.z))
+                new THREE.Vector3(0, 0, segments[0].size.z),
+                new THREE.Vector3(1, 1, 0),
+                new THREE.Vector3(0, 0, 0))
   );
 
   /* adds the rest of the joints */
@@ -646,7 +669,9 @@ var Leg = function(trunk, pivot, segments, gait) {
       new Joint(segments[i - 1],
                 new THREE.Vector3(0, 0, -segments[i-1].size.z),
                 segments[i],
-                new THREE.Vector3(0, 0, segments[i].size.z))
+                new THREE.Vector3(0, 0, segments[i].size.z),
+                new THREE.Vector3(1, 0, 0),
+                new THREE.Vector3(0, 0, 0))
     );
   }
 };
@@ -681,13 +706,14 @@ Leg.prototype.update = function(timeStep) {
   var trunkCenterPos = this.trunk.toWorldFrame(zero);
   var fv = new THREE.Vector3(0, 5*(this.gait.velocity - trunkCenterVel.y), 0);
 
+  var balanceTorque = new THREE.Vector3();
   for(var i = 0; i < this.joints.length; i++) {
-    var balanceTorque = 0;
+    balanceTorque.set(0, 0, 0);
     if(this.standing) {
-      balanceTorque += this.joints[i].getTorqueForVirtualForce(pivotPosWorld, fh);
-      balanceTorque += this.joints[i].getTorqueForVirtualForce(trunkCenterPos, fv);
+      balanceTorque.add(this.joints[i].getTorqueForVirtualForce(pivotPosWorld, fh));
+      balanceTorque.add(this.joints[i].getTorqueForVirtualForce(trunkCenterPos, fv));
     }
-    this.joints[i].targetAngle = this.q[i];
+    this.joints[i].targetAngle[0] = this.q[i];
     this.joints[i].update(balanceTorque);
   };
 };
