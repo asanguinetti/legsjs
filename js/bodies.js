@@ -8,9 +8,14 @@ var three2BulletTransform = function(threeT, bulletT) {
   var q = new THREE.Quaternion();
   q.setFromRotationMatrix(threeT);
 
+  var o = new Ammo.btVector3(p.x, p.y, p.z);
+  var r = new Ammo.btQuaternion(q.x, q.y, q.z, q.w);
   t.setIdentity();
-  t.setOrigin(new Ammo.btVector3(p.x, p.y, p.z));
-  t.setRotation(new Ammo.btQuaternion(q.x, q.y, q.z, q.w));
+  t.setOrigin(o);
+  t.setRotation(r);
+
+  Ammo.destroy(o);
+  Ammo.destroy(r);
 
   return t;
 };
@@ -215,6 +220,7 @@ RigidBody.prototype.getLinearVelocity = function(localPoint) {
                                 localPoint.y, 
                                 localPoint.z);
     vel.op_add(this.body.getAngularVelocity().cross(lp));
+    Ammo.destroy(lp);
   }
 
   return new THREE.Vector3(vel.x(), vel.y(), vel.z());
@@ -550,6 +556,11 @@ var Joint = function(bodyA, pivotInA, bodyB, pivotInB, angularLowerLimit, angula
   this.axis = [new THREE.Vector3(1, 0, 0), 
                new THREE.Vector3(0, 1, 0),
                new THREE.Vector3(0, 0, 1)];
+
+  /* some auxiliary vectors to reuse and avoid creating too many dynamic objects */
+  /* TODO: maybe it'd be better to use a pool? */
+  this.auxVec1 = new Ammo.btVector3();
+  this.auxVec2 = new Ammo.btVector3();
 };
 
 Joint.prototype.getPosition = function() {
@@ -586,11 +597,15 @@ Joint.prototype.getTorqueForVirtualForce = function(point, force) {
 
 Joint.prototype.update = function(extraTorque) {
   for(var i = 0; i < 3; i++) {
-    var jointAxis = new Ammo.btVector3(this.c.getAxis(i));
+    var jointAxis = this.c.getAxis(i);
+    this.auxVec1.setValue(jointAxis.x(), jointAxis.y(), jointAxis.z());
+    jointAxis = this.auxVec1;
 
     /* calculates the relative angular velocity of the two objects */
-    var deltaOmega = new Ammo.btVector3(this.bodyB.body.getAngularVelocity());
-    deltaOmega.op_sub(this.bodyA.body.getAngularVelocity())
+    var deltaOmega = this.bodyB.body.getAngularVelocity();
+    this.auxVec2.setValue(deltaOmega.x(), deltaOmega.y(), deltaOmega.z());
+    deltaOmega = this.auxVec2;
+    deltaOmega.op_sub(this.bodyA.body.getAngularVelocity());
 
     /* calculates the projection of the relative angular velocity along the joint axis */
     var jointVel = deltaOmega.dot(jointAxis);
