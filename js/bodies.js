@@ -214,16 +214,15 @@ RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
 
 RigidBody.prototype.getLinearVelocity = function(localPoint) {
   var vel = this.body.getLinearVelocity();
+  vel = new THREE.Vector3(vel.x(), vel.y(), vel.z());
 
   if(localPoint !== undefined) {
-    var lp = new Ammo.btVector3(localPoint.x, 
-                                localPoint.y, 
-                                localPoint.z);
-    vel.op_add(this.body.getAngularVelocity().cross(lp));
-    Ammo.destroy(lp);
+    var omega = this.body.getAngularVelocity();
+    omega = new THREE.Vector3(omega.x(), omega.y(), omega.z());
+    vel.add(omega.cross(localPoint));
   }
 
-  return new THREE.Vector3(vel.x(), vel.y(), vel.z());
+  return vel;
 };
 
 RigidBody.prototype.getEulerRotation = function() {
@@ -714,7 +713,7 @@ Leg.prototype.update = function(timeStep) {
   /* calculates the force to help keeping the hip and shoulders height */
   var pivotPosWorld = this.trunk.toWorldFrame(this.pivot);
   var pivotVelWorld = this.trunk.getLinearVelocity(this.pivot);
-  var fh = new THREE.Vector3(0, 0, -5*(this.gait.stanceHeight - pivotPosWorld.z) - 5*(0 - pivotVelWorld.z));
+  var fh = new THREE.Vector3(0, 0, -5*(this.gait.stanceHeight - pivotPosWorld.z) + 5*(0 - pivotVelWorld.z));
 
   var zero = new THREE.Vector3(0, 0, 0)
   var trunkCenterVel = this.trunk.getLinearVelocity(zero);
