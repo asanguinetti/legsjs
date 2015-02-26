@@ -40,6 +40,10 @@ var bullet2ThreeTransform = function(bulletT, threeT) {
   return t;
 };
 
+var signedAngleTo = function(a, b) {
+  return Math.atan2(a.x*b.y - a.y*b.x, a.x*b.x + a.y*b.y);
+};
+
 var extend = function(extended, base) {
   extended.prototype = base.prototype;
   extended.prototype.base = base;
@@ -198,6 +202,8 @@ RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
   var p = worldPoint;
   if(worldPoint === undefined)
     p = new THREE.Vector3();
+
+  p.copy(localPoint);
 
   var t = this.btTransform;
   if(this.body !== undefined)
@@ -710,15 +716,24 @@ Leg.prototype.update = function(timeStep) {
            2*this.segments[2].size.z],
           this.gait.targeFootPos);
 
+  var feetPos = new THREE.Vector3(0, 0, -this.segments[2].size.z);
+  feetPos = this.trunk.toWorldFrame(feetPos, feetPos);
+
   /* calculates the force to help keeping the hip and shoulders height */
   var pivotPosWorld = this.trunk.toWorldFrame(this.pivot);
   var pivotVelWorld = this.trunk.getLinearVelocity(this.pivot);
-  var fh = new THREE.Vector3(0, 0, -5*(this.gait.stanceHeight - pivotPosWorld.z) + 5*(0 - pivotVelWorld.z));
+  var fh = new THREE.Vector3(0, 0, -0*(this.gait.stanceHeight - pivotPosWorld.z) + 0*(0 - pivotVelWorld.z));
 
   var zero = new THREE.Vector3(0, 0, 0)
   var trunkCenterVel = this.trunk.getLinearVelocity(zero);
   var trunkCenterPos = this.trunk.toWorldFrame(zero);
-  var fv = new THREE.Vector3(0, 5*(this.gait.velocity - trunkCenterVel.y), 0);
+  var fv = new THREE.Vector3(0, 0*(this.gait.velocity - trunkCenterVel.y), 0);
+
+  var forward = new THREE.Vector3(0, 1, 0);
+  var curHeading = this.trunk.toWorldFrame(forward).sub(trunkCenterPos);
+  var deltaHeading = signedAngleTo(curHeading, forward);
+  var fHeading = this.trunk.toWorldFrame(new THREE.Vector3(this.pivot.x, 0, 0)).sub(trunkCenterPos);
+  fHeading.normalize().multiplyScalar(2000*deltaHeading);
 
   var balanceTorque = new THREE.Vector3();
   for(var i = 0; i < this.joints.length; i++) {
@@ -726,6 +741,7 @@ Leg.prototype.update = function(timeStep) {
     if(this.standing) {
       balanceTorque.add(this.joints[i].getTorqueForVirtualForce(pivotPosWorld, fh));
       balanceTorque.add(this.joints[i].getTorqueForVirtualForce(trunkCenterPos, fv));
+      balanceTorque.add(this.joints[i].getTorqueForVirtualForce(feetPos, fHeading));
     }
     this.joints[i].targetAngle[0] = this.q[i];
     this.joints[i].update(balanceTorque);
