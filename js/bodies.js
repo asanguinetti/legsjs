@@ -667,9 +667,18 @@ var Leg = function(trunk, pivot, segments, gait) {
   this.q1 = [];
   this.q2 = [];
 
-  /* TODO: place the segments in the right orientation using IK */
+  /* uses IK to get the initial orientations */
+  this.gait.update(0);
+  ikSolve(this.q1, this.q2,
+          [2*this.segments[0].size.z,
+           2*this.segments[1].size.z,
+           2*this.segments[2].size.z],
+          this.gait.targeFootPos);
 
   /* adds the shoulder/hip joint */
+  var xAxis = new THREE.Vector3(1, 0, 0);
+  var angle = this.q()[0];
+  segments[0].rotateAxis(xAxis, angle, new THREE.Vector3(0, 0, this.segments[0].size.z));
   segments[0].snapTo(new THREE.Vector3(0, 0, segments[0].size.z), trunk, pivot);
   this.joints.push(
       new Joint(trunk,
@@ -682,6 +691,8 @@ var Leg = function(trunk, pivot, segments, gait) {
 
   /* adds the rest of the joints */
   for(var i = 1; i < segments.length; i++) {
+    angle += this.q()[i];
+    segments[i].rotateAxis(xAxis, angle, new THREE.Vector3(0, 0, this.segments[i].size.z));
     segments[i].snapTo(new THREE.Vector3(0, 0, segments[i].size.z),
                        segments[i-1],
                        new THREE.Vector3(0, 0, -segments[i-1].size.z));
@@ -743,25 +754,31 @@ Leg.prototype.update = function(timeStep) {
       balanceTorque.add(this.joints[i].getTorqueForVirtualForce(trunkCenterPos, fv));
       balanceTorque.add(this.joints[i].getTorqueForVirtualForce(feetPos, fHeading));
     }
-    this.joints[i].targetAngle[0] = this.q[i];
+    this.joints[i].targetAngle[0] = this.q()[i];
     this.joints[i].update(balanceTorque);
   };
 };
 
 var FrontLeg = function(trunk, pivot, segments, gait) {
   this.base.call(this, trunk, pivot, segments, gait);
-  this.q = this.q1;
 };
 
-FrontLeg.prototype = Leg.prototype;
+FrontLeg.prototype = Object.create(Leg.prototype);
 FrontLeg.prototype.base = Leg;
 FrontLeg.prototype.constructor = FrontLeg;
 
-var RearLeg = function(trunk, pivot, segments, gait) {
-  this.base.call(this, trunk, pivot, segments, gait);
-  this.q = this.q2;
+FrontLeg.prototype.q = function() {
+  return this.q1;
 };
 
-RearLeg.prototype = Leg.prototype;
+var RearLeg = function(trunk, pivot, segments, gait) {
+  this.base.call(this, trunk, pivot, segments, gait);
+};
+
+RearLeg.prototype = Object.create(Leg.prototype);
 RearLeg.prototype.base = Leg;
 RearLeg.prototype.constructor = RearLeg;
+
+RearLeg.prototype.q = function() {
+  return this.q2;
+};
