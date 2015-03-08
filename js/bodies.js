@@ -207,10 +207,8 @@ RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
 
   var t = this.btTransform;
   if(this.body !== undefined)
-  {
-    t = this.btTransformAux;
-    this.body.getMotionState().getWorldTransform(t);
-  }
+    t = this.body.getCenterOfMassTransform();
+
   bullet2ThreeTransform(t, mat4);
 
   p.applyMatrix4(mat4);
