@@ -741,7 +741,7 @@ Leg.prototype.update = function(timeStep) {
   var forward = new THREE.Vector3(0, 1, 0);
   var curHeading = this.trunk.toWorldFrame(forward).sub(trunkCenterPos);
   var deltaHeading = signedAngleTo(curHeading, forward);
-  var fHeading = this.trunk.toWorldFrame(new THREE.Vector3(this.pivot.x, 0, 0)).sub(trunkCenterPos);
+  var fHeading = this.trunk.toWorldFrame(new THREE.Vector3(-this.pivot.y, 0, 0)).sub(trunkCenterPos);
   fHeading.normalize().multiplyScalar(2000*deltaHeading);
 
   var balanceTorque = new THREE.Vector3();
