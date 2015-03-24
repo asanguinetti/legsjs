@@ -683,8 +683,8 @@ var Leg = function(trunk, pivot, segments, gait) {
                 pivot,
                 segments[0],
                 new THREE.Vector3(0, 0, segments[0].size.z),
-                new THREE.Vector3(1, 1, 0),
-                new THREE.Vector3(0, 0, 0))
+                new THREE.Vector3(1, -Math.PI/4, 0),
+                new THREE.Vector3(0, Math.PI/4, 0))
   );
 
   /* adds the rest of the joints */
