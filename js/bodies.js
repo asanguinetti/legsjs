@@ -45,7 +45,7 @@ var signedAngleTo = function(a, b) {
 };
 
 var extend = function(extended, base) {
-  extended.prototype = base.prototype;
+  extended.prototype = Object.create(base.prototype);
   extended.prototype.base = base;
   extended.prototype.constructor = extended;
 };
@@ -151,11 +151,11 @@ Gait.prototype.update = function(timeStep) {
 
 var FrontLegGait = function(phase) {
   this.base.call(this, phase);
-  this.strikePosition = 1;
-  this.takeOffPosition = -1;
+  this.strikePosition = 2;
+  this.takeOffPosition = -2;
   this.strikeAngle = Math.PI/4;
   this.takeOffAngle = -Math.PI/4;
-  this.maxSwingHeight = 1;
+  this.maxSwingHeight = 1.5;
   this.stanceHeight = 4.5;
 };
 
