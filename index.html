@@ -6,153 +6,28 @@
   <title>Creature Demo - Axel Sanguinetti</title>
   
   <script type="text/javascript" src="js/three.js"></script>
-  <script type="text/javascript" src="js/cannon.js"></script>
   <script type="text/javascript" src="js/ammo.js"></script>
+  <script type="text/javascript" src="js/demo_utils.js"></script>
   <script type="text/javascript" src="js/bodies.js"></script>
+  <script type="text/javascript" src="js/log.js"></script>
   
   <script type="text/javascript">
   
   'use strict';
   
-  // Function declarations
-  var addVisual;
-  var initScene;
-  var updatePhysics;
-  var updateVisuals;
-  var updateMuscleVisual;
-  var updateMuscleLength;
-  var createGround;
-  var createTrunk;
-  var createBone;
-  var createFrontLeg
-  var createBackLeg;
-  var animate;
-  var respectJoints;
-  var onTouchStart;
-  var onMouseMove;
-  var onKeyDown;
-  var onMouseWheel;
-  var updateCamera;
-  var ikSolve;
-
-  // Internal objects
-  var scene;
-
-  var DebugDrawer = function() {
-    var wrappedFrom;
-    var wrappedTo;
-    var wrappedColor;
-    var line;
-
-    this.debugMode = 0 | (1 << 11) | (1 << 12);
-    this.objIndex = 0;
-    this.objects = [];
-    for(var i = 0; i < 1500; i++)
-    {
-      this.objects.push(new THREE.Line(new THREE.Geometry(), 
-                                       new THREE.LineBasicMaterial({color: new THREE.Color()})));
-      this.objects[i].geometry.vertices.push(new THREE.Vector3());
-      this.objects[i].geometry.vertices.push(new THREE.Vector3());
-    }
-    this.btDebugDrawer = new Ammo.DebugDraw();
-    this.btDebugDrawer.userData = this;
-    this.btDebugDrawer.drawLine = function(from, to, color) {
-      wrappedFrom = Ammo.wrapPointer(from, Ammo.btVector3);
-      wrappedTo = Ammo.wrapPointer(to, Ammo.btVector3);
-      wrappedColor = Ammo.wrapPointer(color, Ammo.btVector3);
-
-      line = this.userData.objects[this.userData.objIndex++];
-      line.material.color.setRGB(wrappedColor.x(), wrappedColor.y(), wrappedColor.z());
-      line.geometry.vertices[0].set(wrappedFrom.x(), wrappedFrom.y(), wrappedFrom.z());
-      line.geometry.vertices[1].set(wrappedTo.x(), wrappedTo.y(), wrappedTo.z());
-      line.geometry.verticesNeedUpdate = true;
-
-      scene.add(line);
-    };
-    this.btDebugDrawer.drawContactPoint = function(PointOnB, normalOnB, distance, lifeTime, color) {
-      // TODO: implement
-    };
-    this.btDebugDrawer.reportErrorWarning = function(warningString) {
-      console.log(warningString);
-    };
-    this.btDebugDrawer.draw3dText = function(location, textString) {
-      // TODO: implement
-    };
-    this.btDebugDrawer.setDebugMode = function(debugMode) {
-      this.userData.debugMode = debugMode;
-    };
-    this.btDebugDrawer.getDebugMode = function() {
-      return this.userData.debugMode;
-    };
-  };
-
-  DebugDrawer.prototype.clear = function() {
-    this.objIndex = 0;
-  };
-  
-  initScene = function() {
-    scene = new THREE.Scene();
-
-    scene.renderer = new THREE.WebGLRenderer({ antialias: true });
-    scene.renderer.setClearColor( 0xeeeeff, 1);
-    scene.renderer.setSize( window.innerWidth, window.innerHeight );
-    scene.renderer.shadowMapEnabled = true;
-    scene.renderer.shadowMapSoft = true;
-    document.getElementById( 'viewport' ).appendChild( scene.renderer.domElement );
-    scene.renderer.domElement.addEventListener('touchstart', onTouchStart);
-    scene.renderer.domElement.addEventListener('touchmove', onMouseMove);
-    scene.renderer.domElement.addEventListener("mousewheel", onMouseWheel, false);
-    scene.renderer.domElement.addEventListener("DOMMouseScroll", onMouseWheel, false);
-    scene.renderer.domElement.addEventListener('mousemove', onMouseMove);
-
-    scene.camera = new THREE.PerspectiveCamera(
-      35,
-      window.innerWidth / window.innerHeight,
-      1,
-      1000
-    );
-    scene.camera.position.set( 60, 60, 50 );
-    scene.camera.up.set(0,0,1);
-    scene.camera.lookAt( scene.position );
-    scene.add( scene.camera );
-    
-    // Light
-    var light = new THREE.DirectionalLight( 0xFFFFFF );
-    light.position.set( -15, 20, 40 );
-    light.target.position.copy( scene.position );
-    light.castShadow = true;
-    light.shadowCameraLeft = -60;
-    light.shadowCameraTop = -60;
-    light.shadowCameraRight = 60;
-    light.shadowCameraBottom = 60;
-    light.shadowCameraNear = 20;
-    light.shadowCameraFar = 200;
-    light.shadowBias = -.0005
-    light.shadowMapWidth = light.shadowMapHeight = 2048;
-    light.shadowDarkness = .7;
-    scene.add( light );
-
-    var collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
-    var dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
-    var overlappingPairCache = new Ammo.btDbvtBroadphase();
-    var solver = new Ammo.btSequentialImpulseConstraintSolver();
-    // scene.debugDrawer = new DebugDrawer();
-    scene.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
-    // scene.world.setDebugDrawer(scene.debugDrawer.btDebugDrawer);
-    scene.world.setGravity(new Ammo.btVector3(0,0,-20));
-
-    scene.world.bodies = [];
+  var initScene = function() {
+    var demo = new Demo(document.getElementById('viewport'));
 
     /* ground */
     var ground = new Ground(new THREE.Vector3(500, 500, 0.5));
-    ground.buildAndInsert(scene);
+    ground.buildAndInsert(demo.scene);
 
     /* trunk */
     var mass = 2;
     var trunk = new Trunk(mass, new THREE.Vector3(3.5, 5, 2.5));
     trunk.translate(0, 0, 10);
-    trunk.buildAndInsert(scene);
-    scene.camera.target = trunk;
+    trunk.buildAndInsert(demo.scene);
+    demo.scene.camera.target = trunk;
 
     var legFL = new FrontLeg(trunk, 
                              new THREE.Vector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
@@ -184,20 +59,20 @@
 
     var legs = [legFL, legFR, legRL, legRR];
     legs.forEach(function(leg) {
-      leg.buildAndInsert(scene);
+      leg.buildAndInsert(demo.scene);
     });
 
     /* sets a callback for updating the torques on the joints */
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
-      scene.world.clearForces();
-      scene.world.bodies.forEach( function(b) {
+      demo.scene.world.clearForces();
+      demo.scene.world.bodies.forEach(function(b) {
         b.body.applyGravity();
-      } );
+      });
 
       /* iterates over the contact manifolds to check if any leg is touching the ground */
-      var numManifolds = scene.world.getDispatcher().getNumManifolds();
+      var numManifolds = demo.scene.world.getDispatcher().getNumManifolds();
       for(var i = 0; i < numManifolds; i++) {
-          var contactManifold =  scene.world.getDispatcher().getManifoldByIndexInternal(i);
+          var contactManifold =  demo.scene.world.getDispatcher().getManifoldByIndexInternal(i);
           var obA = contactManifold.getBody0();
           var obB = contactManifold.getBody1();
           var legSegment;
@@ -224,140 +99,14 @@
         leg.update(timeStep);
         leg.standing = false;
       });
+
+      logger.step(timeStep);
     });
 
-    scene.world.setInternalTickCallback(fp, undefined, true);
+    demo.scene.world.setInternalTickCallback(fp, undefined, true);
 
-    animate();
+    demo.animate();
   };
-
-  var pinchDist = 0;
-  onTouchStart = function(event) {
-    if (typeof event == 'undefined')
-      event = window.event;
-    
-    if (event.touches){
-      if(event.touches.length == 2) {
-        pinchDist = vec2.distance([event.touches[0].pageX, 
-                                   event.touches[0].pageY], 
-                                  [event.touches[1].pageX, 
-                                   event.touches[1].pageY]);
-        event.preventDefault();
-      }
-    }
-  }
-
-  var inclination = Math.PI/4;
-  var azimuth = 0;
-  var yaw = 0;
-  var pitch = 0;
-  onMouseMove = function(event) {
-    var x;
-    var y;
-
-    if (typeof event == 'undefined')
-      event = window.event;
-    
-    event.preventDefault();
-
-    if ( event.changedTouches ) {
-      if(event.touches.length == 2) {
-        /* it's a pinch to zoom gesture */
-        newDist = vec2.distance([event.touches[0].pageX, 
-                                 event.touches[0].pageY], 
-                                [event.touches[1].pageX, 
-                                 event.touches[1].pageY]);
-        zoom += (pinchDist - newDist);
-        pinchDist = newDist;
-        zoom = Math.max(0, Math.min(zoom, 80));
-        return;
-      }
-      event = event.changedTouches[0];
-    }
-      
-    if(event.clientX) {
-        x = event.clientX+document.body.scrollLeft;
-        y = event.clientY+document.body.scrollTop;
-    } else if(event.pageX) {
-        x = event.pageX+window.pageXOffset;
-        y = event.pageY+window.pageYOffset;
-    }
-
-    /* azimuth goes from -PI to PI as the cursor's X goes from left to right */
-    azimuth = x * 2 * Math.PI / window.innerWidth - Math.PI;
-
-    /* inclination goes from PI/2 to 0 as the cursor's Y goes from top to bottom"*/
-    inclination = (window.innerHeight - y) * Math.PI / (2*window.innerHeight);
-
-    /* azimuth will work for yaw since it goes from -PI to PI */
-    yaw = azimuth;
-
-    /* we need pitch to go from PI/2 to -PI/2 as Y goes from top to bottom */
-    pitch = (window.innerHeight - y) * Math.PI / (window.innerHeight) - Math.PI/2;
-  }
-
-  var zoom = 50;
-  onMouseWheel = function(event) {
-    /* cross-browser wheel delta */
-    var event = window.event || event; /* IE */
-    var delta = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)));
-    zoom += delta;
-    zoom = Math.max(0, Math.min(zoom, 80));
-  }
-
-  var cameraPosMat = new THREE.Matrix4();
-  var m1 = new THREE.Matrix4();
-  var m2 = new THREE.Matrix4();
-  var m3 = new THREE.Matrix4();
-  updateCamera = function()
-  {
-    /* start with the camera at the origin */
-    scene.camera.position.copy( scene.position );
-
-    /* rotates the camera position around the Z axis for the azimuth */
-    m1.makeRotationZ(azimuth);
-
-    /* raises the camera rotating around the X axis for the inclination */
-    m2.makeRotationX(-inclination);
-
-    /* moves the camera away from the center */
-    m3.makeTranslation(0, -zoom, 0);
-
-    cameraPosMat.multiplyMatrices( m1, m2 );
-    cameraPosMat.multiply( m3 );
-
-    /* applies the transformation to the camera position */
-    scene.camera.position.applyMatrix4(cameraPosMat);
-    scene.camera.position.add(scene.camera.target.visual.position);
-    scene.camera.lookAt(scene.camera.target.visual.position);
-  }
-
-  var time_last = Date.now();
-  var time_delta = 0;
-  updatePhysics = function() {
-      /* steps world */
-      time_delta = Date.now() - time_last;
-      scene.world.stepSimulation(time_delta / 1000.0, 1500, 3 / 600);
-      time_last += time_delta;
-  }
-
-  updateVisuals = function() {
-    /* Read position data into visuals */
-    scene.world.bodies.forEach( function(b) {
-      b.updateVisual();
-    } );
-    // scene.world.debugDrawWorld();
-    // scene.debugDrawer.clear();
-  }
-  
-  animate = function() {
-    requestAnimationFrame( animate );
-    updateCamera();
-    updateVisuals();
-    updatePhysics();
-    scene.renderer.clear();
-    scene.renderer.render( scene, scene.camera );
-  }
 
   window.onload = initScene;
   
