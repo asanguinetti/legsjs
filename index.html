@@ -9,7 +9,6 @@
   <script type="text/javascript" src="js/ammo.js"></script>
   <script type="text/javascript" src="js/demo_utils.js"></script>
   <script type="text/javascript" src="js/bodies.js"></script>
-  <script type="text/javascript" src="js/log.js"></script>
   
   <script type="text/javascript">
   
@@ -99,8 +98,6 @@
         leg.update(timeStep);
         leg.standing = false;
       });
-
-      logger.step(timeStep);
     });
 
     demo.scene.world.setInternalTickCallback(fp, undefined, true);
