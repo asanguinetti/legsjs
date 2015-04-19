@@ -28,33 +28,44 @@
     trunk.buildAndInsert(demo.scene);
     demo.scene.camera.target = trunk;
 
+    var pdGains = {
+      tracking: [2000, 60],
+      height: [0, 0],
+      velocity: [0, 0],
+      heading: [2000, 0]
+    };
+
     var legFL = new FrontLeg(trunk, 
                              new THREE.Vector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
                              [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                               new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                               new Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
-                             new FrontLegGait(0.0));
+                             new FrontLegGait(0.0),
+                             pdGains);
 
     var legFR = new FrontLeg(trunk, 
                              new THREE.Vector3(trunk.size.x, trunk.size.y, -trunk.size.z),
                              [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                               new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                               new Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
-                             new FrontLegGait(0.5));
+                             new FrontLegGait(0.5),
+                             pdGains);
 
     var legRL = new RearLeg(trunk, 
                             new THREE.Vector3(-trunk.size.x, -trunk.size.y, -trunk.size.z),
                             [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.2))],
-                            new RearLegGait(0.35));
+                            new RearLegGait(0.35),
+                            pdGains);
 
     var legRR = new RearLeg(trunk, 
                             new THREE.Vector3(trunk.size.x, -trunk.size.y, -trunk.size.z),
                             [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.2))],
-                            new RearLegGait(0.85));
+                            new RearLegGait(0.85),
+                            pdGains);
 
     var legs = [legFL, legFR, legRL, legRR];
     legs.forEach(function(leg) {

@@ -545,12 +545,15 @@ Trunk.prototype.buildVisual = function() {
   this.visual = visual;
 };
 
-var Joint = function(bodyA, pivotInA, bodyB, pivotInB, angularLowerLimit, angularUpperLimit) {
+var Joint = function(bodyA, pivotInA, bodyB, pivotInB, pGain, dGain, 
+                     angularLowerLimit, angularUpperLimit) {
   this.bodyA = bodyA;
   this.bodyB = bodyB;
   this.pivotInA = pivotInA;
   this.pivotInB = pivotInB;
   this.targetAngle = [0, 0, 0];
+  this.pGain = pGain;
+  this.dGain = dGain;
 
   this.angularLowerLimit = angularLowerLimit;
   this.angularUpperLimit = angularUpperLimit;
@@ -614,7 +617,7 @@ Joint.prototype.update = function(extraTorque) {
     var jointVel = deltaOmega.dot(jointAxis);
 
     /* calculates the torque to apply using PD */
-    var torqueScalar = 2000*(this.targetAngle[i] + this.c.getAngle(i)) + 60*(0 - jointVel);
+    var torqueScalar = this.pGain*(this.targetAngle[i] + this.c.getAngle(i)) + this.dGain*(0 - jointVel);
     torqueScalar += extraTorque.getComponent(i);
 
     /* applies the equal and opposite torques to both objects */
@@ -654,7 +657,7 @@ Joint.prototype.buildAndInsert = function(scene) {
   scene.world.addConstraint(this.c, true);
 };
 
-var Leg = function(trunk, pivot, segments, gait) {
+var Leg = function(trunk, pivot, segments, gait, pdGains) {
   this.trunk = trunk;
   this.pivot = pivot;
   this.segments = segments;
@@ -664,6 +667,7 @@ var Leg = function(trunk, pivot, segments, gait) {
   this.time = 0;
   this.q1 = [];
   this.q2 = [];
+  this.pdGains = pdGains;
 
   /* uses IK to get the initial orientations */
   this.gait.update(0);
@@ -683,6 +687,8 @@ var Leg = function(trunk, pivot, segments, gait) {
                 pivot,
                 segments[0],
                 new THREE.Vector3(0, 0, segments[0].size.z),
+                this.pdGains.tracking[0],
+                this.pdGains.tracking[1],
                 new THREE.Vector3(1, -Math.PI/4, 0),
                 new THREE.Vector3(0, Math.PI/4, 0))
   );
@@ -699,6 +705,8 @@ var Leg = function(trunk, pivot, segments, gait) {
                 new THREE.Vector3(0, 0, -segments[i-1].size.z),
                 segments[i],
                 new THREE.Vector3(0, 0, segments[i].size.z),
+                this.pdGains.tracking[0],
+                this.pdGains.tracking[1],
                 new THREE.Vector3(1, 0, 0),
                 new THREE.Vector3(0, 0, 0))
     );
@@ -731,18 +739,18 @@ Leg.prototype.update = function(timeStep) {
   /* calculates the force to help keeping the hip and shoulders height */
   var pivotPosWorld = this.trunk.toWorldFrame(this.pivot);
   var pivotVelWorld = this.trunk.getLinearVelocity(this.pivot);
-  var fh = new THREE.Vector3(0, 0, -0*(this.gait.stanceHeight - pivotPosWorld.z) + 0*(0 - pivotVelWorld.z));
+  var fh = new THREE.Vector3(0, 0, -this.pdGains.height[0]*(this.gait.stanceHeight - pivotPosWorld.z) + this.pdGains.height[1]*(0 - pivotVelWorld.z));
 
   var zero = new THREE.Vector3(0, 0, 0)
   var trunkCenterVel = this.trunk.getLinearVelocity(zero);
   var trunkCenterPos = this.trunk.toWorldFrame(zero);
-  var fv = new THREE.Vector3(0, 0*(this.gait.velocity - trunkCenterVel.y), 0);
+  var fv = new THREE.Vector3(0, this.pdGains.velocity[0]*(this.gait.velocity - trunkCenterVel.y), 0);
 
   var forward = new THREE.Vector3(0, 1, 0);
   var curHeading = this.trunk.toWorldFrame(forward).sub(trunkCenterPos);
   var deltaHeading = signedAngleTo(curHeading, forward);
   var fHeading = this.trunk.toWorldFrame(new THREE.Vector3(-this.pivot.y, 0, 0)).sub(trunkCenterPos);
-  fHeading.normalize().multiplyScalar(2000*deltaHeading);
+  fHeading.normalize().multiplyScalar(this.pdGains.heading[0]*deltaHeading);
 
   var balanceTorque = new THREE.Vector3();
   for(var i = 0; i < this.joints.length; i++) {
@@ -757,8 +765,8 @@ Leg.prototype.update = function(timeStep) {
   };
 };
 
-var FrontLeg = function(trunk, pivot, segments, gait) {
-  this.base.call(this, trunk, pivot, segments, gait);
+var FrontLeg = function(trunk, pivot, segments, gait, pdGains) {
+  this.base.call(this, trunk, pivot, segments, gait, pdGains);
 };
 
 FrontLeg.prototype = Object.create(Leg.prototype);
@@ -769,8 +777,8 @@ FrontLeg.prototype.q = function() {
   return this.q1;
 };
 
-var RearLeg = function(trunk, pivot, segments, gait) {
-  this.base.call(this, trunk, pivot, segments, gait);
+var RearLeg = function(trunk, pivot, segments, gait, pdGains) {
+  this.base.call(this, trunk, pivot, segments, gait, pdGains);
 };
 
 RearLeg.prototype = Object.create(Leg.prototype);
