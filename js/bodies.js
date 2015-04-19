@@ -725,7 +725,7 @@ Leg.prototype.buildAndInsert = function(scene) {
   });
 };
 
-Leg.prototype.update = function(timeStep) {
+Leg.prototype.update = function(timeStep, logger) {
   this.gait.update(timeStep);
   ikSolve(this.q1, this.q2,
           [2*this.segments[0].size.z,
@@ -751,6 +751,8 @@ Leg.prototype.update = function(timeStep) {
   var deltaHeading = signedAngleTo(curHeading, forward);
   var fHeading = this.trunk.toWorldFrame(new THREE.Vector3(-this.pivot.y, 0, 0)).sub(trunkCenterPos);
   fHeading.normalize().multiplyScalar(this.pdGains.heading[0]*deltaHeading);
+
+  logger.setInfo('DeltaHeading', deltaHeading);
 
   var balanceTorque = new THREE.Vector3();
   for(var i = 0; i < this.joints.length; i++) {
