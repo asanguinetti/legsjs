@@ -179,6 +179,9 @@ var RigidBody = function(mass, size) {
   this.collidesWith = CollisionGroup.GROUND;
   this.transform = new THREE.Matrix4();
   this.transformAux = new THREE.Matrix4();
+  this.q = new THREE.Quaternion();
+  this.vel = new THREE.Vector3();
+  this.omega = new THREE.Vector3();
   this.btTransformAux = new Ammo.btTransform();
 };
 
@@ -216,32 +219,71 @@ RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
   return p;
 };
 
-RigidBody.prototype.getLinearVelocity = function(localPoint) {
-  var vel = this.body.getLinearVelocity();
-  vel = new THREE.Vector3(vel.x(), vel.y(), vel.z());
-
-  if(localPoint !== undefined) {
-    var omega = this.body.getAngularVelocity();
-    omega = new THREE.Vector3(omega.x(), omega.y(), omega.z());
-    vel.add(omega.cross(localPoint));
-  }
-
-  return vel;
-};
-
-RigidBody.prototype.getEulerRotation = function() {
+RigidBody.prototype.toLocalFrame = function(worldPoint, localPoint) {
   var mat4 = new THREE.Matrix4();
+  
+  var p = localPoint;
+  if(localPoint === undefined)
+    p = new THREE.Vector3();
+
+  p.copy(worldPoint);
 
   var t = this.btTransform;
   if(this.body !== undefined)
-  {
-    t = this.btTransformAux;
-    this.body.getMotionState().getWorldTransform(t);
-  }
+    t = this.body.getCenterOfMassTransform();
+
   bullet2ThreeTransform(t, mat4);
 
+  mat4.getInverse(mat4);
+  p.applyMatrix4(mat4);
+
+  return p;
+};
+
+RigidBody.prototype.getLinearVelocity = function(localPoint) {
+  var vel = this.body.getLinearVelocity();
+  this.vel.set(vel.x(), vel.y(), vel.z());
+
+  if(localPoint !== undefined) {
+    var omega = this.getAngularVelocity();
+    this.vel.add(omega.cross(localPoint));
+  }
+
+  return this.vel;
+};
+
+RigidBody.prototype.getAngularVelocity = function() {
+  var omega = this.body.getAngularVelocity();
+  this.omega.set(omega.x(), omega.y(), omega.z());
+
+  return this.omega;
+};
+
+RigidBody.prototype.getOrientation = function() {
+  var q = this.body.getCenterOfMassTransform().getRotation()
+  this.q.set(q.x(), q.y(), q.z(), q.w());
+
+  return this.q;
+};
+
+RigidBody.prototype.getHeading = function() {
+  var heading = this.getOrientation();
   var euler = new THREE.Euler();
-  euler.setFromRotationMatrix(mat4, 'XYZ');
+  euler.setFromQuaternion(heading, 'XYZ');
+  heading.setFromAxisAngle(new THREE.Vector3(0, 0, 1), euler.z);
+  return heading;
+};
+
+RigidBody.prototype.getEulerRotation = function() {
+  var t = this.btTransform;
+  if(this.body !== undefined)
+  {
+    t = this.body.getCenterOfMassTransform();
+  }
+  bullet2ThreeTransform(t, this.transformAux);
+
+  var euler = new THREE.Euler();
+  euler.setFromRotationMatrix(this.transformAux, 'XYZ');
   return euler.toVector3();
 };
 
@@ -546,7 +588,7 @@ Trunk.prototype.buildVisual = function() {
 };
 
 var Joint = function(bodyA, pivotInA, bodyB, pivotInB, pGain, dGain, 
-                     angularLowerLimit, angularUpperLimit) {
+                     angularLowerLimit, angularUpperLimit, absAngle) {
   this.bodyA = bodyA;
   this.bodyB = bodyB;
   this.pivotInA = pivotInA;
@@ -554,6 +596,14 @@ var Joint = function(bodyA, pivotInA, bodyB, pivotInB, pGain, dGain,
   this.targetAngle = [0, 0, 0];
   this.pGain = pGain;
   this.dGain = dGain;
+
+  this.absAngle = absAngle;
+  this.targetQ = new THREE.Quaternion();
+  this.auxEuler = new THREE.Euler();
+  this.curQ = new THREE.Quaternion();
+  this.curOmega = new THREE.Vector3();
+  this.torque = new THREE.Vector3();
+  this.btTorque = new Ammo.btVector3();
 
   this.angularLowerLimit = angularLowerLimit;
   this.angularUpperLimit = angularUpperLimit;
@@ -628,6 +678,99 @@ Joint.prototype.update = function(extraTorque) {
   }
 };
 
+Joint.prototype.computeTargetQFromRelAngles = function(sagittal, coronal) {
+  this.auxEuler.set(sagittal, coronal, 0, 'XYZ');
+  this.targetQ.setFromEuler(this.auxEuler);
+};
+
+Joint.prototype.getRelativeOrientation = function() {
+  var qA = this.bodyA.getOrientation();
+  var qB = this.bodyB.getOrientation();
+  this.curQ.multiplyQuaternions(qA.conjugate(), qB);
+
+  return this.curQ;
+};
+
+Joint.prototype.getRelativeVelocity = function() {
+  var omegaA = this.bodyA.body.getAngularVelocity();
+  var omegaB = this.bodyB.body.getAngularVelocity();
+
+  this.curOmega.set(omegaB.x(), omegaB.y(), omegaB.z());
+
+  /* avoids creating a new auxiliary vector to do this simple operation */
+  this.curOmega.x -= omegaA.x();
+  this.curOmega.y -= omegaA.y();
+  this.curOmega.z -= omegaA.z();
+
+  return this.curOmega;
+};
+
+/** Computes the torque to bring the current orientation to the target 
+ *  orientation. Target angular velocity is always zero.
+ *
+ * \param  Quaternion curQ Current orientation.
+ * \param  Quaternion targetQ Target orientation.
+ * \param  Vector curOmega Current angular velocity.
+ * \return Vector Torque.
+ *
+ * \note the resulting reference frame is the same as that of the parameters.
+ *       Also make sure that the parameters are in the same reference frame.
+ */
+Joint.prototype.computeRelTorque = function(curQ, targetQ, curOmega) {
+  var e = 0.0000000001;
+
+  /* starts by computing the proportional part */
+  /* qDelta = curQ^-1 * targetQ */
+  var qDelta = targetQ;
+  qDelta.multiplyQuaternions(curQ.conjugate(), targetQ);
+  this.torque.set(qDelta.x, qDelta.y, qDelta.z);
+
+  var sinHalfAngle = this.torque.length();
+
+  /* avoids division by zero if the orientations match too closely */
+  if(sinHalfAngle > e || sinHalfAngle < -e)
+  {
+    var angle = 2*Math.asin(sinHalfAngle);
+    var sign = (qDelta < 0) ? -1 : 1;
+    this.torque.multiplyScalar(1/sinHalfAngle * angle * -this.pGain * sign);
+  }
+  else
+  {
+    this.torque.set(0, 0, 0);
+  }
+
+  /* converts the torque from child frame to parent frame */
+  this.torque.applyQuaternion(curQ.conjugate());
+
+  /* adds the derivative part */
+  this.torque.add(curOmega.multiplyScalar(this.dGain));
+};
+
+Joint.prototype.computeTorque = function(charFrame) {
+  if(!this.absAngle) {
+    /* computes the torque in bodyA's frame */
+    this.computeRelTorque(this.getRelativeOrientation(), 
+                          this.targetQ, 
+                          this.getRelativeVelocity());
+
+    /* converts the resulting torque to world frame */;
+    this.bodyA.toWorldFrame(this.torque, this.torque);
+  } else {
+    /* computes the torque directly in world frame */
+    this.computeRelTorque(this.bodyB.getOrientation(), 
+                          this.targetQ.multiplyQuaternions(charFrame, this.targetQ),
+                          this.bodyB.getAngularVelocity());
+  }
+};
+
+Joint.prototype.applyTorque = function() {
+  this.btTorque.setValue(this.torque.x, this.torque.y, this.torque.z);
+  /* applies the equal and opposite torques to both objects */
+  this.bodyA.body.applyTorque(this.btTorque);
+  this.btTorque.op_mul(-1);
+  this.bodyB.body.applyTorque(this.btTorque);
+};
+
 Joint.prototype.buildAndInsert = function(scene) {
   var frameInA = new Ammo.btTransform();
   var frameInB = new Ammo.btTransform();
@@ -690,7 +833,8 @@ var Leg = function(trunk, pivot, segments, gait, pdGains) {
                 this.pdGains.tracking[0],
                 this.pdGains.tracking[1],
                 new THREE.Vector3(1, -Math.PI/4, 0),
-                new THREE.Vector3(0, Math.PI/4, 0))
+                new THREE.Vector3(0, Math.PI/4, 0),
+                true)
   );
 
   /* adds the rest of the joints */
@@ -708,7 +852,8 @@ var Leg = function(trunk, pivot, segments, gait, pdGains) {
                 this.pdGains.tracking[0],
                 this.pdGains.tracking[1],
                 new THREE.Vector3(1, 0, 0),
-                new THREE.Vector3(0, 0, 0))
+                new THREE.Vector3(0, 0, 0),
+                false)
     );
   }
 };
@@ -767,6 +912,33 @@ Leg.prototype.update = function(timeStep, logger) {
   };
 };
 
+Leg.prototype.computeTorques = function(timeStep) {
+  /* computes the character orientation (heading of trunk) */
+  var charFrame = new THREE.Quaternion();
+  charFrame.copy(this.trunk.getHeading());
+
+  /* advances the gait */
+  this.gait.update(timeStep);
+
+  /* computes the internal angles for the legs using IK */
+  ikSolve(this.q1, this.q2,
+          [2*this.segments[0].size.z,
+           2*this.segments[1].size.z,
+           2*this.segments[2].size.z],
+          this.gait.targeFootPos);
+
+  /* computes the torques for all the joints */
+  for(var i = 0; i < this.joints.length; i++) {
+    this.joints[i].computeTargetQFromRelAngles(this.q()[i], 0, 0);
+    this.joints[i].computeTorque(charFrame);
+  }
+};
+
+Leg.prototype.applyTorques = function() {
+  for(var i = 0; i < this.joints.length; i++)
+    this.joints[i].applyTorque();
+};
+
 var FrontLeg = function(trunk, pivot, segments, gait, pdGains) {
   this.base.call(this, trunk, pivot, segments, gait, pdGains);
 };
@@ -790,3 +962,84 @@ RearLeg.prototype.constructor = RearLeg;
 RearLeg.prototype.q = function() {
   return this.q2;
 };
+
+var LegFrame = function(trunk, legs) {
+  this.trunk = trunk;
+  this.legs = legs;
+  this.LFTransform = new THREE.Matrix4();
+  this.LFEuler = new THREE.Euler();
+  this.torqueLF = new THREE.Vector3();
+  this.torqueSwing = new THREE.Vector3();
+
+  var zero = new THREE.Vector3(0, 0, 0);
+  var unit = new THREE.Vector3(1, 0, 0);
+  this.torqueLFArrow = new THREE.ArrowHelper(unit, zero, 0, 0xff0000);
+};
+
+LegFrame.prototype.update = function(timeStep) {
+  for(var i = 0; i < this.legs.length; i++)
+    this.legs[i].computeTorques(timeStep);
+
+  this.applyNetTorque();
+};
+
+LegFrame.prototype.applyNetTorque = function() {
+  var numberStanceLegs = 0;
+  this.computeTorqueLF();
+  this.torqueLFArrow.setLength(this.torqueLF.length() * 0.1);
+  var dir = new THREE.Vector3();
+  dir.copy(this.torqueLF);
+  dir.normalize();
+  this.torqueLFArrow.setDirection(dir);
+  this.torqueSwing.set(0, 0, 0);
+  for(var i = 0; i < this.legs.length; i++) {
+    if(this.legs[i].standing)
+      numberStanceLegs++;
+    else
+      this.torqueSwing.add(this.legs[i].joints[0].torque);
+  }
+
+  for(var i = 0; i < this.legs.length; i++)
+  {
+    if(this.legs[i].standing)
+    {
+      this.legs[i].joints[0].torque.subVectors(this.torqueLF, this.torqueSwing);
+      this.legs[i].joints[0].torque.divideScalar(numberStanceLegs);
+    }
+    this.legs[i].applyTorques();
+  }
+};
+
+LegFrame.prototype.computeTorqueLF = function() {
+  var charFrame = new THREE.Quaternion();
+  charFrame.copy(this.trunk.getHeading());
+  var qDelta = this.trunk.getOrientation();
+  var omega = this.trunk.getAngularVelocity();
+
+  var e = 0.0000000001;
+
+  qDelta.conjugate();
+  qDelta.multiply(charFrame);
+  this.torqueLF.set(qDelta.x, qDelta.y, qDelta.z);
+
+  var sinHalfAngle = this.torqueLF.length();
+
+  /* avoids division by zero if the orientations match too closely */
+  if(sinHalfAngle > e || sinHalfAngle < -e)
+  {
+    var angle = 2*Math.asin(sinHalfAngle);
+    var sign = (qDelta < 0) ? -1 : 1;
+    this.torqueLF.multiplyScalar(1/sinHalfAngle * angle * 500 * sign);
+  }
+  else
+  {
+    this.torqueLF.set(0, 0, 0);
+  }
+
+  /* converts the torque from child frame to parent frame */
+  this.torqueLF.applyQuaternion(this.trunk.getOrientation());
+
+  /* adds the derivative part */
+  this.torqueLF.add(omega.multiplyScalar(-2));
+  return this.torqueLF;
+}

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <title>Virtual Force Test - Axel Sanguinetti</title>
+  
+  <script type="text/javascript" src="js/three.js"></script>
+  <script type="text/javascript" src="js/ammo.js"></script>
+  <script type="text/javascript" src="js/demo_utils.js"></script>
+  <script type="text/javascript" src="js/bodies.js"></script>
+  <script type="text/javascript" src="js/log.js"></script>
+  
+  <script type="text/javascript">
+  
+  'use strict';
+
+  var IdleGait = function(phase) {
+    this.base.call(this, phase);
+  };
+
+  extend(IdleGait, Gait);
+
+  IdleGait.prototype.update = function(timeStep) {
+    this.targeFootPos[0] = 0;
+    this.targeFootPos[1] = -5.4;
+    this.targeFootPos[2] = 0;
+  }
+
+  var TappingGait = function(phase) {
+    this.base.call(this, phase);
+  };
+
+  extend(TappingGait, Gait);
+
+  TappingGait.prototype.update = function(timeStep) {
+    this.time += timeStep;
+    this.time %= this.period;
+    this.normalizedTime = this.time / this.period;
+
+    this.targeFootPos[0] = 0;
+    this.targeFootPos[1] = -5.4 + 0.2*Math.abs(Math.sin(this.normalizedTime * 0.5*Math.PI));
+    this.targeFootPos[2] = 0;
+  }
+
+  var initScene = function() {
+    var demo = new Demo(document.getElementById('viewport'));
+    var logger = new NullLogger();
+
+    var gravity = 1;
+    demo.scene.world.setGravity(new Ammo.btVector3(0, 0, -gravity));
+
+    /* ground */
+    var ground = new Ground(new THREE.Vector3(500, 500, 0.5));
+    ground.buildAndInsert(demo.scene);
+
+    /* trunk */
+    var mass = 2;
+    var trunk = new Bone(mass, new THREE.Vector3(1, 1, 2));
+    trunk.translate(0, -trunk.size.y/4, 5.4 + trunk.size.z + 0.5);
+    trunk.buildAndInsert(demo.scene);
+    demo.scene.camera.target = trunk;
+
+    var pdGains = {
+      tracking: [100, 10],
+      height: [0, 0],
+      velocity: [0, 0],
+      heading: [0, 0]
+    };
+
+    var legF = new RearLeg(trunk, 
+                            new THREE.Vector3(trunk.size.x, 0, -trunk.size.z),
+                            [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                             new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                             new Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
+                            new IdleGait(0.0),
+                            pdGains);
+
+    var legR = new RearLeg(trunk, 
+                           new THREE.Vector3(-trunk.size.x, 0, -trunk.size.z),
+                           [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                            new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                            new Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
+                           new IdleGait(0.0),
+                           pdGains);
+
+    var legs = [legF, legR];
+
+    for(var i = 0; i < legs.length; i++) {
+      legs[i].buildAndInsert(demo.scene);
+    };
+
+    var legFrame = new LegFrame(trunk, legs);
+    demo.scene.add(legFrame.torqueLFArrow);
+
+    /* sets a callback for updating the torques on the joints */
+    var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
+      demo.scene.world.clearForces();
+      demo.scene.world.bodies.forEach( function(b) {
+        b.body.applyGravity();
+      } );
+
+      /* iterates over the contact manifolds to check if any leg is touching the ground */
+      var numManifolds = demo.scene.world.getDispatcher().getNumManifolds();
+      for(var i = 0; i < numManifolds; i++) {
+          var contactManifold =  demo.scene.world.getDispatcher().getManifoldByIndexInternal(i);
+          var obA = contactManifold.getBody0();
+          var obB = contactManifold.getBody1();
+          var legSegment;
+
+          /* finds if any of the two objects is the ground */
+          if(Ammo.compare(obA, ground.body))
+            legSegment = obB;
+          else if(Ammo.compare(obB, ground.body))
+            legSegment = obA;
+          else
+            continue;
+
+          /* finds if any of the feet is the other object */
+          legs.forEach(function(leg) {
+            if(Ammo.compare(leg.segments[leg.segments.length - 1].body, legSegment))
+            {
+              leg.standing = true;
+              return false;
+            }
+          });
+      }
+
+      legFrame.update(timeStep);
+
+      legs.forEach(function(leg) {
+        leg.standing = false;
+      });
+    });
+
+    demo.scene.world.setInternalTickCallback(fp, undefined, true);
+
+    demo.animate();
+  };
+
+  window.onload = initScene;
+  
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+</body>
+
+</html>
