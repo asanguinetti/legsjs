@@ -59,6 +59,8 @@
     var trunk = new Bone(mass, new THREE.Vector3(1, 1, 2));
     trunk.translate(0, -trunk.size.y/4, 5.4 + trunk.size.z + 0.5);
     trunk.buildAndInsert(demo.scene);
+    trunk.body.setLinearFactor(new Ammo.btVector3(0, 1, 1));
+    trunk.body.setAngularFactor(new Ammo.btVector3(1, 0, 0));
     demo.scene.camera.target = trunk;
 
     var pdGains = {
