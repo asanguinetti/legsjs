@@ -605,6 +605,10 @@ var Joint = function(bodyA, pivotInA, bodyB, pivotInB, pGain, dGain,
   this.torque = new THREE.Vector3();
   this.btTorque = new Ammo.btVector3();
 
+  var zero = new THREE.Vector3(0, 0, 0);
+  var unit = new THREE.Vector3(1, 0, 0);
+  this.torqueArrow = new THREE.ArrowHelper(unit, zero, 0, 0x00ff00);
+
   this.angularLowerLimit = angularLowerLimit;
   this.angularUpperLimit = angularUpperLimit;
 
@@ -764,6 +768,13 @@ Joint.prototype.computeTorque = function(charFrame) {
 };
 
 Joint.prototype.applyTorque = function() {
+  var dir = new THREE.Vector3(0, 0, 0);
+  dir.copy(this.torque);
+  dir.normalize();
+  this.torqueArrow.position.copy(this.getPosition());
+  this.torqueArrow.setLength(this.torque.length()*0.1);
+  this.torqueArrow.setDirection(dir);
+
   this.btTorque.setValue(this.torque.x, this.torque.y, this.torque.z);
   /* applies the equal and opposite torques to both objects */
   this.bodyA.body.applyTorque(this.btTorque);
@@ -798,6 +809,8 @@ Joint.prototype.buildAndInsert = function(scene) {
                                                  this.angularUpperLimit.z));
 
   scene.world.addConstraint(this.c, true);
+
+  scene.add(this.torqueArrow);
 };
 
 var Leg = function(trunk, pivot, segments, gait, pdGains) {
@@ -990,6 +1003,7 @@ LegFrame.prototype.applyNetTorque = function() {
   var dir = new THREE.Vector3();
   dir.copy(this.torqueLF);
   dir.normalize();
+  this.torqueLFArrow.position.copy(this.trunk.toWorldFrame(new THREE.Vector3(0, 0, 0)));
   this.torqueLFArrow.setDirection(dir);
   this.torqueSwing.set(0, 0, 0);
   for(var i = 0; i < this.legs.length; i++) {
