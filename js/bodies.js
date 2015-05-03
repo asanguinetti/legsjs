@@ -1,3 +1,18 @@
+if(typeof THREE === 'undefined')
+  THREE = require('three');
+
+if(typeof Ammo === 'undefined')
+  Ammo = require('./ammo.js');
+
+var isZero = function(x) {
+  var e = 0.0000000001;
+  return -e < x && x < e;
+};
+
+var clamp = function(x, min, max) {
+  return Math.min(Math.max(x, min), max);
+};
+
 var three2BulletTransform = function(threeT, bulletT) {
   t = bulletT
   if(bulletT === undefined)
@@ -197,6 +212,10 @@ RigidBody.prototype.rotateAxis = function(axis, theta, pivot) {
   this.transform.multiplyMatrices(this.transformAux, this.transform);
   if(pivot !== undefined)
     this.translate(pivot.x, pivot.y, pivot.z);
+  if(this.body !== undefined) {
+    three2BulletTransform(this.transform, this.btTransformAux);
+    this.body.setCenterOfMassTransform(this.btTransformAux);
+  }
 };
 
 RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
@@ -690,7 +709,7 @@ Joint.prototype.computeTargetQFromRelAngles = function(sagittal, coronal) {
 Joint.prototype.getRelativeOrientation = function() {
   var qA = this.bodyA.getOrientation();
   var qB = this.bodyB.getOrientation();
-  this.curQ.multiplyQuaternions(qA.conjugate(), qB);
+  this.curQ.multiplyQuaternions(qB.conjugate(), qA);
 
   return this.curQ;
 };
@@ -706,7 +725,7 @@ Joint.prototype.getRelativeVelocity = function() {
   this.curOmega.y -= omegaA.y();
   this.curOmega.z -= omegaA.z();
 
-  return this.curOmega;
+  return this.curOmega.applyQuaternion(this.bodyA.getOrientation());
 };
 
 /** Computes the torque to bring the current orientation to the target 
@@ -721,8 +740,6 @@ Joint.prototype.getRelativeVelocity = function() {
  *       Also make sure that the parameters are in the same reference frame.
  */
 Joint.prototype.computeRelTorque = function(curQ, targetQ, curOmega) {
-  var e = 0.0000000001;
-
   /* starts by computing the proportional part */
   /* qDelta = curQ^-1 * targetQ */
   var qDelta = targetQ;
@@ -731,12 +748,16 @@ Joint.prototype.computeRelTorque = function(curQ, targetQ, curOmega) {
 
   var sinHalfAngle = this.torque.length();
 
+  /* this could potentially be slightly greater than 1 due to numerical
+   * errors, which is bad for computing the asin later */
+  sinHalfAngle = clamp(sinHalfAngle, -1, 1);
+
   /* avoids division by zero if the orientations match too closely */
-  if(sinHalfAngle > e || sinHalfAngle < -e)
+  if(!isZero(sinHalfAngle))
   {
     var angle = 2*Math.asin(sinHalfAngle);
     var sign = (qDelta < 0) ? -1 : 1;
-    this.torque.multiplyScalar(1/sinHalfAngle * angle * -this.pGain * sign);
+    this.torque.multiplyScalar(1/sinHalfAngle * angle * this.pGain * sign);
   }
   else
   {
@@ -748,6 +769,9 @@ Joint.prototype.computeRelTorque = function(curQ, targetQ, curOmega) {
 
   /* adds the derivative part */
   this.torque.add(curOmega.multiplyScalar(this.dGain));
+
+  if(this.torque.length() > 100)
+    this.torque.multiplyScalar(100/this.torque.length());
 };
 
 Joint.prototype.computeTorque = function(charFrame) {
@@ -758,10 +782,10 @@ Joint.prototype.computeTorque = function(charFrame) {
                           this.getRelativeVelocity());
 
     /* converts the resulting torque to world frame */;
-    this.bodyA.toWorldFrame(this.torque, this.torque);
+    this.torque.applyQuaternion(this.bodyA.getOrientation());
   } else {
     /* computes the torque directly in world frame */
-    this.computeRelTorque(this.bodyB.getOrientation(), 
+    this.computeRelTorque(this.bodyB.getOrientation().conjugate(), 
                           this.targetQ.multiplyQuaternions(charFrame, this.targetQ),
                           this.bodyB.getAngularVelocity());
   }
@@ -1030,20 +1054,22 @@ LegFrame.prototype.computeTorqueLF = function() {
   var qDelta = this.trunk.getOrientation();
   var omega = this.trunk.getAngularVelocity();
 
-  var e = 0.0000000001;
-
   qDelta.conjugate();
   qDelta.multiply(charFrame);
   this.torqueLF.set(qDelta.x, qDelta.y, qDelta.z);
 
   var sinHalfAngle = this.torqueLF.length();
 
+  /* this could potentially be slightly greater than 1 due to numerical
+   * errors, which is bad for computing the asin later */
+  sinHalfAngle = clamp(sinHalfAngle, -1, 1);
+
   /* avoids division by zero if the orientations match too closely */
-  if(sinHalfAngle > e || sinHalfAngle < -e)
+  if(!isZero(sinHalfAngle))
   {
     var angle = 2*Math.asin(sinHalfAngle);
     var sign = (qDelta < 0) ? -1 : 1;
-    this.torqueLF.multiplyScalar(1/sinHalfAngle * angle * 500 * sign);
+    this.torqueLF.multiplyScalar(1/sinHalfAngle * angle * 300 * sign);
   }
   else
   {
@@ -1054,6 +1080,9 @@ LegFrame.prototype.computeTorqueLF = function() {
   this.torqueLF.applyQuaternion(this.trunk.getOrientation());
 
   /* adds the derivative part */
-  this.torqueLF.add(omega.multiplyScalar(-2));
+  this.torqueLF.add(omega.multiplyScalar(-10));
   return this.torqueLF;
 }
+
+module.exports.Bone = Bone;
+module.exports.Joint = Joint;

@@ -5,6 +5,7 @@
 <head>
   <title>Virtual Force Test - Axel Sanguinetti</title>
   
+  <script type="text/javascript" src="js/node_dummy.js"></script>
   <script type="text/javascript" src="js/three.js"></script>
   <script type="text/javascript" src="js/ammo.js"></script>
   <script type="text/javascript" src="js/demo_utils.js"></script>
@@ -47,7 +48,7 @@
     var demo = new Demo(document.getElementById('viewport'));
     var logger = new NullLogger();
 
-    var gravity = 1;
+    var gravity = 5;
     demo.scene.world.setGravity(new Ammo.btVector3(0, 0, -gravity));
 
     /* ground */
@@ -64,7 +65,7 @@
     demo.scene.camera.target = trunk;
 
     var pdGains = {
-      tracking: [100, 10],
+      tracking: [300, 10],
       height: [0, 0],
       velocity: [0, 0],
       heading: [0, 0]
