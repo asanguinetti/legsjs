@@ -701,9 +701,9 @@ Joint.prototype.update = function(extraTorque) {
   }
 };
 
-Joint.prototype.computeTargetQFromRelAngles = function(sagittal, coronal) {
-  this.auxEuler.set(sagittal, coronal, 0, 'XYZ');
-  this.targetQ.setFromEuler(this.auxEuler);
+Joint.prototype.computeTargetQFromRelAngles = function(pitch, roll) {
+  this.auxEuler.set(pitch, roll, 0, 'XYZ');
+  this.targetQ.setFromEuler(this.auxEuler).conjugate();
 };
 
 Joint.prototype.getRelativeOrientation = function() {
@@ -786,7 +786,7 @@ Joint.prototype.computeTorque = function(charFrame) {
   } else {
     /* computes the torque directly in world frame */
     this.computeRelTorque(this.bodyB.getOrientation().conjugate(), 
-                          this.targetQ.multiplyQuaternions(charFrame, this.targetQ),
+                          this.targetQ.clone().multiply(charFrame.clone().conjugate()),
                           this.bodyB.getAngularVelocity());
   }
 };
@@ -1081,6 +1081,9 @@ LegFrame.prototype.computeTorqueLF = function() {
 
   /* adds the derivative part */
   this.torqueLF.add(omega.multiplyScalar(-10));
+
+  if(this.torqueLF.length() > 100)
+    this.torqueLF.multiplyScalar(100/this.torqueLF.length());
   return this.torqueLF;
 }
 
