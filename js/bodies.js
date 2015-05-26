@@ -756,16 +756,13 @@ Joint.prototype.computeRelTorque = function(curQ, targetQ, curOmega) {
   if(!isZero(sinHalfAngle))
   {
     var angle = 2*Math.asin(sinHalfAngle);
-    var sign = (qDelta < 0) ? -1 : 1;
+    var sign = (qDelta.w < 0) ? -1 : 1;
     this.torque.multiplyScalar(1/sinHalfAngle * angle * this.pGain * sign);
   }
   else
   {
     this.torque.set(0, 0, 0);
   }
-
-  /* converts the torque from child frame to parent frame */
-  this.torque.applyQuaternion(curQ.conjugate());
 
   /* adds the derivative part */
   this.torque.add(curOmega.multiplyScalar(this.dGain));
@@ -1068,16 +1065,13 @@ LegFrame.prototype.computeTorqueLF = function() {
   if(!isZero(sinHalfAngle))
   {
     var angle = 2*Math.asin(sinHalfAngle);
-    var sign = (qDelta < 0) ? -1 : 1;
+    var sign = (qDelta.w < 0) ? -1 : 1;
     this.torqueLF.multiplyScalar(1/sinHalfAngle * angle * 300 * sign);
   }
   else
   {
     this.torqueLF.set(0, 0, 0);
   }
-
-  /* converts the torque from child frame to parent frame */
-  this.torqueLF.applyQuaternion(this.trunk.getOrientation());
 
   /* adds the derivative part */
   this.torqueLF.add(omega.multiplyScalar(-10));
