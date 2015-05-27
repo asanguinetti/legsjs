@@ -767,8 +767,8 @@ Joint.prototype.computeRelTorque = function(curQ, targetQ, curOmega) {
   /* adds the derivative part */
   this.torque.add(curOmega.multiplyScalar(this.dGain));
 
-  if(this.torque.length() > 100)
-    this.torque.multiplyScalar(100/this.torque.length());
+  if(this.torque.length() > 200)
+    this.torque.multiplyScalar(200/this.torque.length());
 };
 
 Joint.prototype.computeTorque = function(charFrame) {
@@ -997,9 +997,10 @@ RearLeg.prototype.q = function() {
   return this.q2;
 };
 
-var LegFrame = function(trunk, legs) {
+var LegFrame = function(trunk, legs, pdGains) {
   this.trunk = trunk;
   this.legs = legs;
+  this.pdGains = pdGains;
   this.LFTransform = new THREE.Matrix4();
   this.LFEuler = new THREE.Euler();
   this.torqueLF = new THREE.Vector3();
@@ -1066,7 +1067,7 @@ LegFrame.prototype.computeTorqueLF = function() {
   {
     var angle = 2*Math.asin(sinHalfAngle);
     var sign = (qDelta.w < 0) ? -1 : 1;
-    this.torqueLF.multiplyScalar(1/sinHalfAngle * angle * 300 * sign);
+    this.torqueLF.multiplyScalar(1/sinHalfAngle * angle * this.pdGains.tracking[0] * sign);
   }
   else
   {
@@ -1074,10 +1075,10 @@ LegFrame.prototype.computeTorqueLF = function() {
   }
 
   /* adds the derivative part */
-  this.torqueLF.add(omega.multiplyScalar(-10));
+  this.torqueLF.add(omega.multiplyScalar(-this.pdGains.tracking[1]));
 
-  if(this.torqueLF.length() > 100)
-    this.torqueLF.multiplyScalar(100/this.torqueLF.length());
+  if(this.torqueLF.length() > 200)
+    this.torqueLF.multiplyScalar(200/this.torqueLF.length());
   return this.torqueLF;
 }
 
