@@ -725,7 +725,7 @@ Joint.prototype.getRelativeVelocity = function() {
   this.curOmega.y -= omegaA.y();
   this.curOmega.z -= omegaA.z();
 
-  return this.curOmega.applyQuaternion(this.bodyA.getOrientation());
+  return this.curOmega.applyQuaternion(this.bodyA.getOrientation().conjugate());
 };
 
 /** Computes the torque to bring the current orientation to the target 
@@ -781,10 +781,15 @@ Joint.prototype.computeTorque = function(charFrame) {
     /* converts the resulting torque to world frame */;
     this.torque.applyQuaternion(this.bodyA.getOrientation());
   } else {
-    /* computes the torque directly in world frame */
-    this.computeRelTorque(this.bodyB.getOrientation().conjugate(), 
-                          this.targetQ.clone().multiply(charFrame.clone().conjugate()),
-                          this.bodyB.getAngularVelocity());
+    /* computes the torque in character frame */
+    this.computeRelTorque(this.bodyB.getOrientation().conjugate().multiply(charFrame), 
+                          this.targetQ,
+                          this.bodyB.getAngularVelocity().applyQuaternion(charFrame.conjugate()));
+    /* revert the character frame to its original value */
+    charFrame.conjugate();
+
+    /* converts the resulting torque to world frame */;
+    this.torque.applyQuaternion(charFrame);
   }
 };
 
@@ -1073,6 +1078,8 @@ LegFrame.prototype.computeTorqueLF = function() {
   {
     this.torqueLF.set(0, 0, 0);
   }
+
+  this.torqueLF.applyQuaternion(this.trunk.getOrientation());
 
   /* adds the derivative part */
   this.torqueLF.add(omega.multiplyScalar(-this.pdGains.tracking[1]));

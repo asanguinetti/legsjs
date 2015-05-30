@@ -249,10 +249,11 @@ common.rotatedCharFrameTest = function(test)
   /* for the absolute joint the torque will try to make a composed rotation */
   this.joint.targetQ.set(Math.sin(Math.PI/8), 0, 0, Math.cos(Math.PI/8));
   this.joint.targetQ.normalize();
+  var dir = new THREE.Vector3();
+  dir.fromArray(charFrame.clone().conjugate().multiply(this.joint.targetQ).toArray());
+  dir.applyQuaternion(charFrame);
   this.joint.computeTorque(charFrame);
   /* targetQ has been updated with the character frame when computing the torque */
-  var dir = new THREE.Vector3();
-  dir.fromArray(this.joint.targetQ.clone().multiply(charFrame.clone().conjugate()).toArray());
   if(this.joint.absAngle)
     test.ok(dirEqual(this.joint.torque, dir),
             'Torque expected to be aligned with ' + dir.toArray());
