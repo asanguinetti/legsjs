@@ -850,6 +850,7 @@ var Leg = function(trunk, pivot, segments, gait, pdGains) {
   this.q1 = [];
   this.q2 = [];
   this.pdGains = pdGains;
+  this.footPos = new THREE.Vector3();
 
   /* uses IK to get the initial orientations */
   this.gait.update(0);
@@ -951,7 +952,7 @@ Leg.prototype.update = function(timeStep, logger) {
   };
 };
 
-Leg.prototype.computeTorques = function(timeStep) {
+Leg.prototype.computeTorques = function(timeStep, bfP, bfD, bfGains) {
   /* computes the character orientation (heading of trunk) */
   var charFrame = new THREE.Quaternion();
   charFrame.copy(this.trunk.getHeading());
@@ -968,7 +969,9 @@ Leg.prototype.computeTorques = function(timeStep) {
 
   /* computes the torques for all the joints */
   for(var i = 0; i < this.joints.length; i++) {
-    this.joints[i].computeTargetQFromRelAngles(this.q()[i], 0, 0);
+    var pitch = bfP.y * bfGains[i][0] + bfD.y * bfGains[i][1] + this.q()[i];
+    var roll = -bfP.x * bfGains[i][0];
+    this.joints[i].computeTargetQFromRelAngles(pitch, roll);
     this.joints[i].computeTorque(charFrame);
   }
 };
@@ -976,6 +979,13 @@ Leg.prototype.computeTorques = function(timeStep) {
 Leg.prototype.applyTorques = function() {
   for(var i = 0; i < this.joints.length; i++)
     this.joints[i].applyTorque();
+};
+
+Leg.prototype.getFootPos = function() {
+  var footSegment = this.segments[this.segments.length - 1];
+  this.footPos.set(0, 0, -footSegment.size.z);
+  footSegment.toWorldFrame(this.footPos, this.footPos);
+  return this.footPos;
 };
 
 var FrontLeg = function(trunk, pivot, segments, gait, pdGains) {
@@ -1002,7 +1012,7 @@ RearLeg.prototype.q = function() {
   return this.q2;
 };
 
-var LegFrame = function(trunk, legs, pdGains) {
+var LegFrame = function(trunk, legs, pdGains, fbGains) {
   this.trunk = trunk;
   this.legs = legs;
   this.pdGains = pdGains;
@@ -1010,6 +1020,11 @@ var LegFrame = function(trunk, legs, pdGains) {
   this.LFEuler = new THREE.Euler();
   this.torqueLF = new THREE.Vector3();
   this.torqueSwing = new THREE.Vector3();
+  
+  this.fbGains = fbGains;
+  this.fbP = new THREE.Vector3();
+  this.fbD = new THREE.Vector3();
+  this.standWorldPos = new THREE.Vector3();
 
   var zero = new THREE.Vector3(0, 0, 0);
   var unit = new THREE.Vector3(1, 0, 0);
@@ -1017,11 +1032,55 @@ var LegFrame = function(trunk, legs, pdGains) {
 };
 
 LegFrame.prototype.update = function(timeStep) {
+  this.computeFeedbackAngles();
+
+  var zero = new THREE.Vector3();
   for(var i = 0; i < this.legs.length; i++)
-    this.legs[i].computeTorques(timeStep);
+  {
+    if(this.legs[i].standing)
+      this.legs[i].computeTorques(timeStep, zero, zero, this.fbGains);
+    else
+      this.legs[i].computeTorques(timeStep, this.fbP, this.fbD, this.fbGains);
+  }
 
   this.applyNetTorque();
 };
+
+LegFrame.prototype.computeFeedbackAngles = function() {
+  /* uses the average of the pivot points as an approximation for the CM */
+  var numStanceLegs = 0;
+  this.fbP.set(0, 0, 0);
+  this.fbD.set(0, 0, 0);
+  this.standWorldPos.set(0, 0, 0);
+  for(var i = 0; i < this.legs.length; i++)
+  {
+    this.fbP.add(this.legs[i].pivot);
+    this.fbD.add(this.trunk.getLinearVelocity(this.legs[i].pivot));
+    if(this.legs[i].standing)
+    {
+      numStanceLegs++;
+      this.standWorldPos.add(this.legs[i].getFootPos());    
+    }
+  }
+
+  if(numStanceLegs > 0)
+  {
+    this.standWorldPos.multiplyScalar(1/numStanceLegs);
+    this.fbP.multiplyScalar(1/this.legs.length);
+    this.trunk.toWorldFrame(this.fbP, this.fbP);
+    this.fbP.z = 0;
+    this.standWorldPos.z = 0;
+    this.fbP.sub(this.standWorldPos);
+    this.fbP.applyQuaternion(this.trunk.getHeading().conjugate());
+
+    this.fbD.multiplyScalar(1/this.legs.length);
+    this.fbD.applyQuaternion(this.trunk.getHeading().conjugate());
+  }
+  else
+  {
+    this.fbP.set(0, 0, 0);
+  }
+}
 
 LegFrame.prototype.applyNetTorque = function() {
   var numberStanceLegs = 0;

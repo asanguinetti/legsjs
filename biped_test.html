@@ -77,6 +77,12 @@
       heading: [0, 0]
     };
 
+    var fbGains = [
+      [0.12, 0.02],
+      [0, 0],
+      [0, 0]
+    ];
+
     var legF = new RearLeg(trunk, 
                             new THREE.Vector3(trunk.size.x, 0, -trunk.size.z),
                             [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
@@ -99,7 +105,7 @@
       legs[i].buildAndInsert(demo.scene);
     };
 
-    var legFrame = new LegFrame(trunk, legs, pdGains);
+    var legFrame = new LegFrame(trunk, legs, pdGains, fbGains);
     demo.scene.add(legFrame.torqueLFArrow);
 
     /* sets a callback for updating the torques on the joints */
