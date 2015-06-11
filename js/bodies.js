@@ -1150,3 +1150,7 @@ LegFrame.prototype.computeTorqueLF = function() {
 
 module.exports.Bone = Bone;
 module.exports.Joint = Joint;
+module.exports.Gait = Gait;
+module.exports.RearLeg = RearLeg;
+module.exports.FrontLeg = FrontLeg;
+module.exports.LegFrame = LegFrame;
