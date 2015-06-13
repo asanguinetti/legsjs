@@ -14,6 +14,11 @@ var dirEqual = function(v, dir) {
 };
 
 
+var dirNearEqual = function(v, dir) {
+  return isNearZero(v.angleTo(dir));
+};
+
+
 var extend = function(extended, base) {
   extended.prototype = Object.create(base.prototype);
   extended.prototype.base = base;
@@ -46,7 +51,7 @@ exports.setUp = function(callback)
   /* trunk */
   var mass = 2;
   var trunk = new bodies.Bone(mass, new THREE.Vector3(1, 1, 2));
-  trunk.translate(0, -trunk.size.y/4, 5.4 + trunk.size.z + 0.5);
+  trunk.translate(0, 0, 5.4 + trunk.size.z + 0.5);
   trunk.buildAndInsert(scene);
 
   var pdGains = {
@@ -98,6 +103,34 @@ exports.basicTest = function(test)
 
   test.ok(dirEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
           'The proportional feedback is expected to point in the direction of the -X axis');
+
+  test.done();
+};
+
+exports.rotatedFrameTest = function(test)
+{
+  rotations = [
+    Math.PI/2,
+    Math.PI/4 - Math.PI/2,
+    Math.PI - Math.PI/4,
+    -Math.PI/2
+  ];
+
+  for(var k = 0; k < rotations.length; k++)
+  {
+    this.legFrame.trunk.rotateAxis(new THREE.Vector3(0, 0, 1), rotations[ k ]);
+    for(var i = 0; i < this.legFrame.legs.length; i++)
+      for(var j = 0; j < this.legFrame.legs[ i ].segments.length; j++)
+        this.legFrame.legs[ i ].segments[ j ].rotateAxis(new THREE.Vector3(0, 0, 1), rotations[ k ]);
+
+    /* the expected feedback angles should be roughly the same for any orientation of the frame */
+    this.legFrame.computeFeedbackAngles();
+    test.ok(isNearZero(this.legFrame.fbD.length()),
+            'The derivative feedback is expected to be zero since the CM is not moving');
+
+    test.ok(dirNearEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
+            'The proportional feedback is expected to point in the direction of the -X axis');
+  }
 
   test.done();
 };
