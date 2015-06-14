@@ -970,7 +970,7 @@ Leg.prototype.computeTorques = function(timeStep, bfP, bfD, bfGains) {
   /* computes the torques for all the joints */
   for(var i = 0; i < this.joints.length; i++) {
     var pitch = bfP.y * bfGains[i][0] + bfD.y * bfGains[i][1] + this.q()[i];
-    var roll = -bfP.x * bfGains[i][0];
+    var roll = -bfP.x * bfGains[i][0] - bfD.x * bfGains[i][1];
     this.joints[i].computeTargetQFromRelAngles(pitch, roll);
     this.joints[i].computeTorque(charFrame);
   }
