@@ -67,24 +67,24 @@ exports.setUp = function(callback)
     [0, 0]
   ];
 
-  var stanceLeg = new bodies.RearLeg(trunk, 
-                                new THREE.Vector3(trunk.size.x, 0, -trunk.size.z),
-                                [new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                                 new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                                 new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
-                                new IdleGait(0.5),
-                                pdGains);
-  stanceLeg.standing = true;
+  this.stanceLeg = new bodies.RearLeg(trunk, 
+                                      new THREE.Vector3(trunk.size.x, 0, -trunk.size.z),
+                                      [new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                                       new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                                       new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
+                                      new IdleGait(0.5),
+                                      pdGains);
+  this.stanceLeg.standing = true;
 
-  var swingLeg = new bodies.RearLeg(trunk, 
-                                new THREE.Vector3(-trunk.size.x, 0, -trunk.size.z),
-                                [new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                                 new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                                 new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
-                                new IdleGait(0.0),
-                                pdGains);
+  this.swingLeg = new bodies.RearLeg(trunk, 
+                                     new THREE.Vector3(-trunk.size.x, 0, -trunk.size.z),
+                                     [new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                                      new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
+                                      new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
+                                     new IdleGait(0.0),
+                                     pdGains);
 
-  var legs = [stanceLeg, swingLeg];
+  var legs = [this.stanceLeg, this.swingLeg];
 
   for(var i = 0; i < legs.length; i++) {
     legs[i].buildAndInsert(scene);
@@ -134,3 +134,43 @@ exports.rotatedFrameTest = function(test)
 
   test.done();
 };
+
+exports.rotatedSwingLegTest = function(test)
+{
+  /* the expected feedback angles should be roughly the same for any orientation of the swing leg */
+  var zero = new THREE.Vector3(0, 0, 0);
+
+  this.swingLeg.segments[0].rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI/4, zero);
+  for(var i = 1; i < this.swingLeg.segments.length; i++)
+  {
+    this.swingLeg.segments[i].rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI/4, zero);
+    this.swingLeg.segments[i].snapTo(new THREE.Vector3(0, 0, this.swingLeg.segments[i].size.z),
+                                     this.swingLeg.segments[i-1],
+                                     new THREE.Vector3(0, 0, -this.swingLeg.segments[i-1].size.z));
+  }
+
+  this.legFrame.computeFeedbackAngles();
+  test.ok(isNearZero(this.legFrame.fbD.length()),
+          'The derivative feedback is expected to be zero since the CM is not moving');
+
+  test.ok(dirEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
+          'The proportional feedback is expected to point in the direction of the -X axis');
+
+  this.swingLeg.segments[0].rotateAxis(new THREE.Vector3(0, 1, 0), Math.PI/4, zero);
+  for(var i = 1; i < this.swingLeg.segments.length; i++)
+  {
+    this.swingLeg.segments[i].rotateAxis(new THREE.Vector3(0, 1, 0), Math.PI/4, zero);
+    this.swingLeg.segments[i].snapTo(new THREE.Vector3(0, 0, this.swingLeg.segments[i].size.z),
+                                     this.swingLeg.segments[i-1],
+                                     new THREE.Vector3(0, 0, -this.swingLeg.segments[i-1].size.z));
+  }
+
+  this.legFrame.computeFeedbackAngles();
+  test.ok(isNearZero(this.legFrame.fbD.length()),
+          'The derivative feedback is expected to be zero since the CM is not moving');
+
+  test.ok(dirEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
+          'The proportional feedback is expected to point in the direction of the -X axis');
+
+  test.done();
+}
