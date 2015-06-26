@@ -17,6 +17,11 @@ var dirEqual = function(v, dir) {
 };
 
 
+var dirNearEqual = function(v, dir) {
+  return isNearZero(v.angleTo(dir));
+};
+
+
 exports.setUp = function(callback)
 {
   var scene = new THREE.Scene();
@@ -255,11 +260,31 @@ common.rotatedCharFrameTest = function(test)
   this.joint.computeTorque(charFrame);
   /* targetQ has been updated with the character frame when computing the torque */
   if(this.joint.absAngle)
-    test.ok(dirEqual(this.joint.torque, dir),
+    test.ok(dirNearEqual(this.joint.torque, dir),
             'Torque expected to be aligned with ' + dir.toArray());
   else
     test.ok(dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
             'Torque expected to be in the direction of the X axis');
+
+  /* align both bodies with the character frame */
+  this.joint.bodyA.rotateAxis(new THREE.Vector3(0, 0, 1),
+                              Math.PI/2,
+                              this.joint.pivotInA);
+
+  this.joint.bodyB.rotateAxis(new THREE.Vector3(0, 0, 1),
+                              Math.PI/2,
+                              this.joint.pivotInB);
+
+  this.joint.targetQ = new THREE.Quaternion();
+  this.joint.computeTorque(charFrame);
+  test.ok(isNearZero(this.joint.torque.length()),
+          'Torque expected to be zero since the target relative orientation is zero');
+
+  this.joint.targetQ.set(Math.sin(Math.PI/8), 0, 0, Math.cos(Math.PI/8));
+  this.joint.targetQ.normalize();
+  this.joint.computeTorque(charFrame);
+  test.ok(dirEqual(this.joint.torque, new THREE.Vector3(0, 1, 0)),
+          'Torque expected to be in the direction of the Y axis');
 
   test.done();
 };
@@ -284,7 +309,7 @@ common.combinedRotationsTest = function(test)
   this.joint.targetQ.normalize();
   this.joint.computeTorque(charFrame);
   if(this.joint.absAngle)
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
+    test.ok(dirNearEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
             'Torque expected to be in the direction of the X axis');
   else
     test.ok(isNearZero(this.joint.torque.length()), 
