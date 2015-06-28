@@ -286,11 +286,16 @@ RigidBody.prototype.getOrientation = function() {
 };
 
 RigidBody.prototype.getHeading = function() {
-  var heading = this.getOrientation();
-  var euler = new THREE.Euler();
-  euler.setFromQuaternion(heading, 'XYZ');
-  heading.setFromAxisAngle(new THREE.Vector3(0, 0, 1), euler.z);
-  return heading;
+  /* uses the swing/twist decomposition of the orientation of the trunk to get
+   * a twist around a Z axis and a swing that aligns the rotation angle with the
+   * Z axis
+   * the idea is that the swing is done before the twist, and so:
+   * rot = twist * swing */
+  var rot = this.getOrientation();
+  rot.x = 0;
+  rot.y = 0;
+  rot.normalize();
+  return rot;
 };
 
 RigidBody.prototype.getEulerRotation = function() {
@@ -1112,10 +1117,16 @@ LegFrame.prototype.applyNetTorque = function() {
 
 LegFrame.prototype.computeTorqueLF = function() {
   var charFrame = new THREE.Quaternion();
+
+  /* gets the heading as a twist/swing decomposition of the orientation of the
+   * trunk, where orientation = heading * swing */
   charFrame.copy(this.trunk.getHeading());
-  var qDelta = this.trunk.getOrientation();
   var omega = this.trunk.getAngularVelocity();
 
+  /* we want the swing to be the identity without affecting the heading
+   * so in the trunk's local frame, we need to induce a rotation of -swing
+   * so qDelta = -swing = -orientation * heading */
+  var qDelta = this.trunk.getOrientation();
   qDelta.conjugate();
   qDelta.multiply(charFrame);
   this.torqueLF.set(qDelta.x, qDelta.y, qDelta.z);
