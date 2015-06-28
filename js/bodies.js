@@ -1030,6 +1030,8 @@ var LegFrame = function(trunk, legs, pdGains, fbGains) {
   this.fbP = new THREE.Vector3();
   this.fbD = new THREE.Vector3();
   this.standWorldPos = new THREE.Vector3();
+  this.COMPos = new THREE.Vector3();
+  this.COMVel = new THREE.Vector3();
 
   var zero = new THREE.Vector3(0, 0, 0);
   var unit = new THREE.Vector3(1, 0, 0);
@@ -1051,16 +1053,48 @@ LegFrame.prototype.update = function(timeStep) {
   this.applyNetTorque();
 };
 
+LegFrame.prototype.computeCOMPosNVel = function() {
+  var aux = new THREE.Vector3();
+  var totalMass = 0;
+
+  this.trunk.toWorldFrame(aux, aux);
+  aux.multiplyScalar(this.trunk.mass);
+  this.COMPos.add(aux);
+
+  aux = this.trunk.getLinearVelocity();
+  aux.multiplyScalar(this.trunk.mass);
+  this.COMVel.add(aux);
+
+  totalMass += this.trunk.mass;
+
+  for(var i = 0; i < this.legs.length; i++) {
+    var leg = this.legs[i]
+    for (var i = 0; i < leg.segments.length; i++) {
+      aux.set(0, 0, 0);
+      leg.segments[i].toWorldFrame(aux, aux);
+      aux.multiplyScalar(leg.segments[i].mass);
+      this.COMPos.add(aux);
+
+      aux.set(0, 0, 0);
+      aux = leg.segments[i].getLinearVelocity();
+      aux.multiplyScalar(leg.segments[i].mass);
+      this.COMVel.add(aux);
+
+      totalMass += leg.segments[i].mass;
+    };
+  };
+
+  this.COMPos.multiplyScalar(1/totalMass);
+  this.COMVel.multiplyScalar(1/totalMass);
+};
+
 LegFrame.prototype.computeFeedbackAngles = function() {
-  /* uses the average of the pivot points as an approximation for the CM */
   var numStanceLegs = 0;
-  this.fbP.set(0, 0, 0);
-  this.fbD.set(0, 0, 0);
+  this.fbP.copy(this.COMPos);
+  this.fbD.copy(this.COMVel);
   this.standWorldPos.set(0, 0, 0);
   for(var i = 0; i < this.legs.length; i++)
   {
-    this.fbP.add(this.legs[i].pivot);
-    this.fbD.add(this.trunk.getLinearVelocity(this.legs[i].pivot));
     if(this.legs[i].standing)
     {
       numStanceLegs++;
@@ -1070,15 +1104,12 @@ LegFrame.prototype.computeFeedbackAngles = function() {
 
   if(numStanceLegs > 0)
   {
+    this.computeCOMPosNVel();
     this.standWorldPos.multiplyScalar(1/numStanceLegs);
-    this.fbP.multiplyScalar(1/this.legs.length);
-    this.trunk.toWorldFrame(this.fbP, this.fbP);
-    this.fbP.z = 0;
-    this.standWorldPos.z = 0;
     this.fbP.sub(this.standWorldPos);
+    this.fbP.z = 0;
     this.fbP.applyQuaternion(this.trunk.getHeading().conjugate());
 
-    this.fbD.multiplyScalar(1/this.legs.length);
     this.fbD.applyQuaternion(this.trunk.getHeading().conjugate());
   }
   else
