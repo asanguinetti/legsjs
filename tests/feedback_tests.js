@@ -1,22 +1,7 @@
 var assert = require('assert')
 var THREE = require('three');
 var bodies = require('../js/bodies.js');
-
-
-var isNearZero = function(x) {
-  var e = 0.0001;
-  return -e < x && x < e;
-};
-
-
-var dirEqual = function(v, dir) {
-  return v.angleTo(dir) == 0;
-};
-
-
-var dirNearEqual = function(v, dir) {
-  return isNearZero(v.angleTo(dir));
-};
+var testUtils = require('./test_utils.js');
 
 
 var extend = function(extended, base) {
@@ -98,10 +83,10 @@ exports.setUp = function(callback)
 exports.basicTest = function(test)
 {
   this.legFrame.computeFeedbackAngles();
-  test.ok(isNearZero(this.legFrame.fbD.length()),
+  test.ok(testUtils.isNearZero(this.legFrame.fbD.length()),
           'The derivative feedback is expected to be zero since the CM is not moving');
 
-  test.ok(dirEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
+  test.ok(testUtils.dirEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
           'The proportional feedback is expected to point in the direction of the -X axis');
 
   test.done();
@@ -125,10 +110,10 @@ exports.rotatedFrameTest = function(test)
 
     /* the expected feedback angles should be roughly the same for any orientation of the frame */
     this.legFrame.computeFeedbackAngles();
-    test.ok(isNearZero(this.legFrame.fbD.length()),
+    test.ok(testUtils.isNearZero(this.legFrame.fbD.length()),
             'The derivative feedback is expected to be zero since the CM is not moving');
 
-    test.ok(dirNearEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
+    test.ok(testUtils.dirNearEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
             'The proportional feedback is expected to point in the direction of the -X axis');
   }
 
@@ -150,10 +135,10 @@ exports.rotatedSwingLegTest = function(test)
   }
 
   this.legFrame.computeFeedbackAngles();
-  test.ok(isNearZero(this.legFrame.fbD.length()),
+  test.ok(testUtils.isNearZero(this.legFrame.fbD.length()),
           'The derivative feedback is expected to be zero since the CM is not moving');
 
-  test.ok(dirEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
+  test.ok(testUtils.dirEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
           'The proportional feedback is expected to point in the direction of the -X axis');
 
   this.swingLeg.segments[0].rotateAxis(new THREE.Vector3(0, 1, 0), Math.PI/4, zero);
@@ -166,10 +151,10 @@ exports.rotatedSwingLegTest = function(test)
   }
 
   this.legFrame.computeFeedbackAngles();
-  test.ok(isNearZero(this.legFrame.fbD.length()),
+  test.ok(testUtils.isNearZero(this.legFrame.fbD.length()),
           'The derivative feedback is expected to be zero since the CM is not moving');
 
-  test.ok(dirEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
+  test.ok(testUtils.dirEqual(this.legFrame.fbP, new THREE.Vector3(-1, 0, 0)),
           'The proportional feedback is expected to point in the direction of the -X axis');
 
   test.done();

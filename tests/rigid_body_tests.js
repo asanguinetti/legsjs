@@ -1,35 +1,10 @@
 var assert = require('assert')
 var THREE = require('three');
 var bodies = require('../js/bodies.js');
+var testUtils = require('./test_utils.js');
 
 
 var common = {};
-
-
-var isNearZero = function(x) {
-  var e = 0.0001;
-  return -e < x && x < e;
-};
-
-
-var dirEqual = function(v, dir) {
-  return v.angleTo(dir) == 0;
-};
-
-
-var dirNearEqual = function(v, dir) {
-  return isNearZero(v.angleTo(dir));
-};
-
-
-var quatNearEqual = function(q1, q2) {
-  var v1 = new THREE.Vector3(q1.x, q1.y, q1.z);
-  var v2 = new THREE.Vector3(q2.x, q2.y, q2.z);
-  v1.multiplyScalar(q1.w);
-  v2.multiplyScalar(q2.w);
-  return isNearZero(q1.w - q2.w) &&
-         (isNearZero(q1.w - 1) || isNearZero(q1.w + 1) || dirNearEqual(v1, v2));
-}
 
 
 exports.setUp = function(callback)
@@ -66,7 +41,7 @@ exports.getHeadingTest = function(test)
   this.rb.rotateAxis(new THREE.Vector3(0, 0, 1), Math.PI/2);
   expected.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI/2);
   heading = this.rb.getHeading();
-  test.ok(quatNearEqual(heading, expected),
+  test.ok(testUtils.quatNearEqual(heading, expected),
           'Expected heading to be PI/2 degrees along the Z axis');
 
   /* x = PI/2, y = 0, z = 0 */
@@ -74,7 +49,7 @@ exports.getHeadingTest = function(test)
   this.rb.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI/2);
   expected.set(0, 0, 0, 1);
   heading = this.rb.getHeading();
-  test.ok(quatNearEqual(heading, expected),
+  test.ok(testUtils.quatNearEqual(heading, expected),
           'Expected heading to be the identity');
 
   expectedSwing.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI/2);
@@ -82,33 +57,33 @@ exports.getHeadingTest = function(test)
   swing.copy(heading);
   swing.conjugate();
   swing.multiply(this.rb.getOrientation());
-  test.ok(quatNearEqual(swing, expectedSwing),
+  test.ok(testUtils.quatNearEqual(swing, expectedSwing),
           'Expected swing to be PI/2 degrees along the X axis');
 
   /* x = PI/2, y = 0, z = PI/2 */
   this.rb.rotateAxis(new THREE.Vector3(0, 0, 1), Math.PI/2);
   expected.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI/2);
   heading = this.rb.getHeading();
-  test.ok(quatNearEqual(heading, expected),
+  test.ok(testUtils.quatNearEqual(heading, expected),
           'Expected heading to be PI/2 degrees along the Z axis');
 
   swing.copy(heading);
   swing.conjugate();
   swing.multiply(this.rb.getOrientation());
-  test.ok(quatNearEqual(swing, expectedSwing),
+  test.ok(testUtils.quatNearEqual(swing, expectedSwing),
           'Expected swing to remain the same');
 
   /* x = PI/2, y = 0, z = PI */
   this.rb.rotateAxis(new THREE.Vector3(0, 0, 1), Math.PI/2);
   expected.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI);
   heading = this.rb.getHeading();
-  test.ok(quatNearEqual(heading, expected),
+  test.ok(testUtils.quatNearEqual(heading, expected),
           'Expected heading to be PI degrees along the Z axis');
 
   swing.copy(heading);
   swing.conjugate();
   swing.multiply(this.rb.getOrientation());
-  test.ok(quatNearEqual(swing, expectedSwing),
+  test.ok(testUtils.quatNearEqual(swing, expectedSwing),
           'Expected swing to remain the same');
 
   /* x = PI, y = PI/2, z = 0 */
@@ -116,13 +91,13 @@ exports.getHeadingTest = function(test)
   this.rb.rotateAxis(new THREE.Vector3(1, 0, 0), Math.PI/2);
   this.rb.rotateAxis(new THREE.Vector3(0, 1, 0), Math.PI/2);
   heading = this.rb.getHeading();
-  test.ok(isNearZero(heading.x) && isNearZero(heading.y),
+  test.ok(testUtils.isNearZero(heading.x) && testUtils.isNearZero(heading.y),
           'Expected heading to be something along the Z axis only');
 
   swing.copy(heading);
   swing.conjugate();
   swing.multiply(this.rb.getOrientation());
-  test.ok(isNearZero(swing.z),
+  test.ok(testUtils.isNearZero(swing.z),
           'Expected swing to be on the XY plane only');
 
   expectedSwing.copy(swing);
@@ -130,22 +105,22 @@ exports.getHeadingTest = function(test)
   /* x = PI, y = PI/2, z = PI/2 */
   this.rb.rotateAxis(new THREE.Vector3(0, 0, 1), Math.PI/2);
   heading = this.rb.getHeading();
-  test.ok(isNearZero(heading.x) && isNearZero(heading.y),
+  test.ok(testUtils.isNearZero(heading.x) && testUtils.isNearZero(heading.y),
           'Expected heading to be something along the Z axis only');
 
   swing.copy(heading);
   swing.conjugate();
   swing.multiply(this.rb.getOrientation());
-  test.ok(isNearZero(swing.z),
+  test.ok(testUtils.isNearZero(swing.z),
           'Expected swing to be on the XY plane only');
-  test.ok(quatNearEqual(swing, expectedSwing),
+  test.ok(testUtils.quatNearEqual(swing, expectedSwing),
           'Expected swing to remain the same');
 
   var euler = new THREE.Euler();
   euler.setFromQuaternion(this.rb.getOrientation(), 'XYZ');
   expected.setFromAxisAngle(new THREE.Vector3(0, 0, 1), euler.z);
   heading = this.rb.getHeading();
-  test.ok(quatNearEqual(heading, expected),
+  test.ok(testUtils.quatNearEqual(heading, expected),
           'Using Euler angles decomposition should give the same result');
 
   test.done();

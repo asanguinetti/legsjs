@@ -1,25 +1,10 @@
 var assert = require('assert')
 var THREE = require('three');
 var bodies = require('../js/bodies.js');
+var testUtils = require('./test_utils.js');
 
 
 var common = {};
-
-
-var isNearZero = function(x) {
-  var e = 0.0001;
-  return -e < x && x < e;
-};
-
-
-var dirEqual = function(v, dir) {
-  return v.angleTo(dir) == 0;
-};
-
-
-var dirNearEqual = function(v, dir) {
-  return isNearZero(v.angleTo(dir));
-};
 
 
 exports.setUp = function(callback)
@@ -89,7 +74,7 @@ common.alignedChildTest = function(test)
    * torque at all. */
   this.joint.targetQ = new THREE.Quaternion();
   this.joint.computeTorque(charFrame);
-  test.ok(isNearZero(this.joint.torque.length()),
+  test.ok(testUtils.isNearZero(this.joint.torque.length()),
           'Torque expected to be zero since the target relative orientation is zero');
 
   /* Now we set a target relative orientation as some positive rotation along the X axis
@@ -104,7 +89,7 @@ common.alignedChildTest = function(test)
   this.joint.targetQ.set(Math.sin(Math.PI/8), 0, 0, Math.cos(Math.PI/8));
   this.joint.targetQ.normalize();
   this.joint.computeTorque(charFrame);
-  test.ok(dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
+  test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
           'Torque expected to be in the direction of the X axis');
 
   test.done();
@@ -122,14 +107,14 @@ common.rotatedChildTest = function(test)
   this.joint.targetQ.set(Math.sin(Math.PI/8), 0, 0, Math.cos(Math.PI/8));
   this.joint.targetQ.normalize();
   this.joint.computeTorque(charFrame);
-  test.ok(isNearZero(this.joint.torque.length()), 
+  test.ok(testUtils.isNearZero(this.joint.torque.length()), 
           'Torque expected to be zero since the target relative orientation is the same as the current one');
 
   /* now try to make it go back to the original orientation */
   /* the torque should be in the negative X axis this time */
   this.joint.targetQ = new THREE.Quaternion();
   this.joint.computeTorque(charFrame);
-  test.ok(dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
+  test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
           'Torque expected to be in the direction of the -X axis');
 
   test.done();
@@ -148,10 +133,10 @@ common.rotatedParentTest = function(test)
   this.joint.targetQ.normalize();
   this.joint.computeTorque(charFrame);
   if(this.joint.absAngle)
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
+    test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
             'Torque expected to be in the direction of the X axis');
   else
-    test.ok(isNearZero(this.joint.torque.length()), 
+    test.ok(testUtils.isNearZero(this.joint.torque.length()), 
             'Torque expected to be zero since the target relative orientation is the same as the current one');
 
   /* now try to make it go back to the original orientation */
@@ -159,10 +144,10 @@ common.rotatedParentTest = function(test)
   this.joint.targetQ = new THREE.Quaternion();
   this.joint.computeTorque(charFrame);
   if(this.joint.absAngle)
-    test.ok(isNearZero(this.joint.torque.length()), 
+    test.ok(testUtils.isNearZero(this.joint.torque.length()), 
             'Torque expected to be zero since the target relative orientation is the same as the current one');
   else
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
+    test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
             'Torque expected to be in the direction of the X axis');
 
   test.done();
@@ -179,14 +164,14 @@ common.angularVelocityTest = function(test)
   /* the torque should be in the X axis since it's applied to the parent segment */
   this.joint.bodyB.body.setAngularVelocity(new Ammo.btVector3(10, 0, 0));
   this.joint.computeTorque(charFrame);
-  test.ok(dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)), 
+  test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)), 
           'Torque expected to be in the direction of the X axis');
 
   /* sets the angular velocity along the -X axis to the child segment */
   /* the torque should be in the -X axis since it's applied to the parent segment */
   this.joint.bodyB.body.setAngularVelocity(new Ammo.btVector3(-10, 0, 0));
   this.joint.computeTorque(charFrame);
-  test.ok(dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
+  test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
           'Torque expected to be in the direction of the -X axis');
 
   /* sets an angular velocity along the X axis to the parent segment */
@@ -194,7 +179,7 @@ common.angularVelocityTest = function(test)
    * to increase relative velocity */
   this.joint.bodyA.body.setAngularVelocity(new Ammo.btVector3(5, 0, 0));
   this.joint.computeTorque(charFrame);
-  test.ok(dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
+  test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
           'Torque expected to be in the direction of the -X axis');
 
   /* sets an angular velocity along the -X axis to the parent segment */
@@ -202,7 +187,7 @@ common.angularVelocityTest = function(test)
    * than the child's */
   this.joint.bodyA.body.setAngularVelocity(new Ammo.btVector3(-5, 0, 0));
   this.joint.computeTorque(charFrame);
-  test.ok(dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
+  test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
           'Torque expected to be in the direction of the -X axis');
 
   /* sets a bigger angular velocity along the -X axis to the parent segment */
@@ -211,20 +196,20 @@ common.angularVelocityTest = function(test)
   this.joint.bodyA.body.setAngularVelocity(new Ammo.btVector3(-15, 0, 0));
   this.joint.computeTorque(charFrame);
   if(this.joint.absAngle)
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
+    test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
             'Torque expected to be in the direction of the -X axis');  
   else
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)), 
+    test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)), 
             'Torque expected to be in the direction of the X axis');
 
   /* makes both velocities equal and opposite. */
   this.joint.bodyA.body.setAngularVelocity(new Ammo.btVector3(-10, 0, 0));
   this.joint.computeTorque(charFrame);
   if(this.joint.absAngle)
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
+    test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(-1, 0, 0)), 
             'Torque expected to be in the direction of the -X axis');  
   else
-    test.ok(isNearZero(this.joint.torque.length()),
+    test.ok(testUtils.isNearZero(this.joint.torque.length()),
             'Torque expected to be zero since the both parent and child velocities are equal and opposite');
 
   test.done();
@@ -245,10 +230,10 @@ common.rotatedCharFrameTest = function(test)
   this.joint.targetQ = new THREE.Quaternion();
   this.joint.computeTorque(charFrame);
   if(this.joint.absAngle)
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(0, 0, -1)),
+    test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(0, 0, -1)),
             'Torque expected in the direction of the -Z axis');
   else
-    test.ok(isNearZero(this.joint.torque.length()),
+    test.ok(testUtils.isNearZero(this.joint.torque.length()),
             'Torque expected to be zero since the target relative orientation is zero');
 
   /* for the absolute joint the torque will try to make a composed rotation */
@@ -260,10 +245,10 @@ common.rotatedCharFrameTest = function(test)
   this.joint.computeTorque(charFrame);
   /* targetQ has been updated with the character frame when computing the torque */
   if(this.joint.absAngle)
-    test.ok(dirNearEqual(this.joint.torque, dir),
+    test.ok(testUtils.dirNearEqual(this.joint.torque, dir),
             'Torque expected to be aligned with ' + dir.toArray());
   else
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
+    test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
             'Torque expected to be in the direction of the X axis');
 
   /* align both bodies with the character frame */
@@ -277,13 +262,13 @@ common.rotatedCharFrameTest = function(test)
 
   this.joint.targetQ = new THREE.Quaternion();
   this.joint.computeTorque(charFrame);
-  test.ok(isNearZero(this.joint.torque.length()),
+  test.ok(testUtils.isNearZero(this.joint.torque.length()),
           'Torque expected to be zero since the target relative orientation is zero');
 
   this.joint.targetQ.set(Math.sin(Math.PI/8), 0, 0, Math.cos(Math.PI/8));
   this.joint.targetQ.normalize();
   this.joint.computeTorque(charFrame);
-  test.ok(dirEqual(this.joint.torque, new THREE.Vector3(0, 1, 0)),
+  test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(0, 1, 0)),
           'Torque expected to be in the direction of the Y axis');
 
   test.done();
@@ -309,19 +294,19 @@ common.combinedRotationsTest = function(test)
   this.joint.targetQ.normalize();
   this.joint.computeTorque(charFrame);
   if(this.joint.absAngle)
-    test.ok(dirNearEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
+    test.ok(testUtils.dirNearEqual(this.joint.torque, new THREE.Vector3(1, 0, 0)),
             'Torque expected to be in the direction of the X axis');
   else
-    test.ok(isNearZero(this.joint.torque.length()), 
+    test.ok(testUtils.isNearZero(this.joint.torque.length()), 
             'Torque expected to be zero since the target relative orientation is the same as the current one');
 
   this.joint.targetQ = new THREE.Quaternion();
   this.joint.computeTorque(charFrame);
   if(this.joint.absAngle)
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(0, 1, 0)), 
+    test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(0, 1, 0)), 
             'Torque expected to be in the direction of the Y axis');
   else
-    test.ok(dirEqual(this.joint.torque, new THREE.Vector3(-67.85983050483657, 67.85983050483655, 28.1084625395696)), 
+    test.ok(testUtils.dirEqual(this.joint.torque, new THREE.Vector3(-67.85983050483657, 67.85983050483655, 28.1084625395696)), 
             'Torque direction does not match the expected');
 
   test.done();
