@@ -988,7 +988,7 @@ Leg.prototype.applyTorques = function() {
 
 Leg.prototype.getFootPos = function() {
   var footSegment = this.segments[this.segments.length - 1];
-  this.footPos.set(0, 0, -footSegment.size.z);
+  this.footPos.set(0, 0, 0);
   footSegment.toWorldFrame(this.footPos, this.footPos);
   return this.footPos;
 };
