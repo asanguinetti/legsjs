@@ -1059,11 +1059,11 @@ LegFrame.prototype.computeCOMPosNVel = function() {
 
   this.trunk.toWorldFrame(aux, aux);
   aux.multiplyScalar(this.trunk.mass);
-  this.COMPos.add(aux);
+  this.COMPos.copy(aux);
 
   aux = this.trunk.getLinearVelocity();
   aux.multiplyScalar(this.trunk.mass);
-  this.COMVel.add(aux);
+  this.COMVel.copy(aux);
 
   totalMass += this.trunk.mass;
 
@@ -1090,8 +1090,6 @@ LegFrame.prototype.computeCOMPosNVel = function() {
 
 LegFrame.prototype.computeFeedbackAngles = function() {
   var numStanceLegs = 0;
-  this.fbP.copy(this.COMPos);
-  this.fbD.copy(this.COMVel);
   this.standWorldPos.set(0, 0, 0);
   for(var i = 0; i < this.legs.length; i++)
   {
@@ -1105,6 +1103,8 @@ LegFrame.prototype.computeFeedbackAngles = function() {
   if(numStanceLegs > 0)
   {
     this.computeCOMPosNVel();
+    this.fbP.copy(this.COMPos);
+    this.fbD.copy(this.COMVel);
     this.standWorldPos.multiplyScalar(1/numStanceLegs);
     this.fbP.sub(this.standWorldPos);
     this.fbP.z = 0;
@@ -1115,6 +1115,7 @@ LegFrame.prototype.computeFeedbackAngles = function() {
   else
   {
     this.fbP.set(0, 0, 0);
+    this.fbD.set(0, 0, 0);
   }
 }
 
