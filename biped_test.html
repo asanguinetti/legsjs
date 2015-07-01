@@ -102,7 +102,7 @@
       legs[i].buildAndInsert(demo.scene);
     };
 
-    var legFrame = new LegFrame(trunk, legs, pdGains, fbGains);
+    var legFrame = new LegFrame(new WalkingGait(), trunk, legs, pdGains, fbGains);
     demo.scene.add(legFrame.torqueLFArrow);
 
     /* sets a callback for updating the torques on the joints */
@@ -129,20 +129,23 @@
             continue;
 
           /* finds if any of the feet is the other object */
-          legs.forEach(function(leg) {
+          for(var j = 0; j < legFrame.legs.length; j++) {
+            var leg = legFrame.legs[j];
             if(Ammo.compare(leg.segments[leg.segments.length - 1].body, legSegment))
             {
               leg.standing = true;
-              return false;
+              legFrame.gait.setContactForLeg(j, true);
+              break;
             }
-          });
+          };
       }
 
       legFrame.update(timeStep);
 
-      legs.forEach(function(leg) {
-        leg.standing = false;
-      });
+      for(var i = 0; i < legFrame.legs.length; i++) {
+        legFrame.gait.setContactForLeg(i, false);
+        legFrame.legs[i].standing = false;
+      };
     });
 
     demo.scene.world.setInternalTickCallback(fp, undefined, true);

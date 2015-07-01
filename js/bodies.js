@@ -188,6 +188,62 @@ var RearLegGait = function(phase) {
 
 extend(RearLegGait, Gait);
 
+var WalkingGait = function() {
+  this.state = 0;
+  this.stateTime = 0;
+
+  /* swh, swk, swa, sth, stk, sta */
+  var liftTargets = [
+    [0.5, -1.1, 0.6+Math.PI/2], [0, -0.05, Math.PI/2]
+  ];
+  var strikeTargets = [
+    [-0.1, -0.05, 0.15+Math.PI/2], [0, -0.1, Math.PI/2]
+  ];
+
+  this.stateTargets = [
+    liftTargets,
+    strikeTargets,
+    liftTargets,
+    strikeTargets
+  ];
+
+  this.stateStanceLeg = [
+    0, 0, 1, 1
+  ];
+};
+
+WalkingGait.prototype.setContactForLeg = function(i, contact) {
+  if((this.state == 1 && i == 1) || (this.state == 3 && i == 0)) {
+    if(contact) {
+      this.state += 1;
+      this.state %= 4;
+      this.stateTime = 0;
+    }
+  }
+};
+
+WalkingGait.prototype.update = function(timeStep) {
+  this.stateTime += timeStep;
+  if(this.state == 0 || this.state == 2) {
+    if(this.stateTime > 0.3) {
+      this.state += 1;
+      this.state %= 4;
+      this.stateTime = 0;
+    }
+  }
+};
+
+WalkingGait.prototype.isStanceLeg = function(i) {
+  return this.stateStanceLeg[this.state] == i;
+};
+
+WalkingGait.prototype.getAnglesForLeg = function(i) {
+  if(this.isStanceLeg(i))
+    return this.stateTargets[this.state][1];
+  else
+    return this.stateTargets[this.state][0];
+};
+
 var RigidBody = function(mass, size) {
   this.mass = mass;
   this.size = size;
@@ -957,24 +1013,14 @@ Leg.prototype.update = function(timeStep, logger) {
   };
 };
 
-Leg.prototype.computeTorques = function(timeStep, bfP, bfD, bfGains) {
+Leg.prototype.computeTorques = function(targetAngles, bfP, bfD, bfGains) {
   /* computes the character orientation (heading of trunk) */
   var charFrame = new THREE.Quaternion();
   charFrame.copy(this.trunk.getHeading());
 
-  /* advances the gait */
-  this.gait.update(timeStep);
-
-  /* computes the internal angles for the legs using IK */
-  ikSolve(this.q1, this.q2,
-          [2*this.segments[0].size.z,
-           2*this.segments[1].size.z,
-           2*this.segments[2].size.z],
-          this.gait.targeFootPos);
-
   /* computes the torques for all the joints */
   for(var i = 0; i < this.joints.length; i++) {
-    var pitch = bfP.y * bfGains[i][0] + bfD.y * bfGains[i][1] + this.q()[i];
+    var pitch = bfP.y * bfGains[i][0] + bfD.y * bfGains[i][1] + targetAngles[i];
     var roll = -bfP.x * bfGains[i][0] - bfD.x * bfGains[i][1];
     this.joints[i].computeTargetQFromRelAngles(pitch, roll);
     this.joints[i].computeTorque(charFrame);
@@ -1017,7 +1063,8 @@ RearLeg.prototype.q = function() {
   return this.q2;
 };
 
-var LegFrame = function(trunk, legs, pdGains, fbGains) {
+var LegFrame = function(gait, trunk, legs, pdGains, fbGains) {
+  this.gait = gait;
   this.trunk = trunk;
   this.legs = legs;
   this.pdGains = pdGains;
@@ -1039,15 +1086,20 @@ var LegFrame = function(trunk, legs, pdGains, fbGains) {
 };
 
 LegFrame.prototype.update = function(timeStep) {
+  /* advances the gait */
+  this.gait.update(timeStep);
+
   this.computeFeedbackAngles();
 
   var zero = new THREE.Vector3();
   for(var i = 0; i < this.legs.length; i++)
   {
-    if(this.legs[i].standing)
-      this.legs[i].computeTorques(timeStep, zero, zero, this.fbGains);
+    if(this.gait.isStanceLeg(i))
+      this.legs[i].computeTorques(this.gait.getAnglesForLeg(i),
+                                  zero, zero, this.fbGains);
     else
-      this.legs[i].computeTorques(timeStep, this.fbP, this.fbD, this.fbGains);
+      this.legs[i].computeTorques(this.gait.getAnglesForLeg(i),
+                                  this.fbP, this.fbD, this.fbGains);
   }
 
   this.applyNetTorque();
@@ -1093,7 +1145,7 @@ LegFrame.prototype.computeFeedbackAngles = function() {
   this.standWorldPos.set(0, 0, 0);
   for(var i = 0; i < this.legs.length; i++)
   {
-    if(this.legs[i].standing)
+    if(this.gait.isStanceLeg(i))
     {
       numStanceLegs++;
       this.standWorldPos.add(this.legs[i].getFootPos());    
@@ -1130,7 +1182,7 @@ LegFrame.prototype.applyNetTorque = function() {
   this.torqueLFArrow.setDirection(dir);
   this.torqueSwing.set(0, 0, 0);
   for(var i = 0; i < this.legs.length; i++) {
-    if(this.legs[i].standing)
+    if(this.gait.isStanceLeg(i))
       numberStanceLegs++;
     else
       this.torqueSwing.add(this.legs[i].joints[0].torque);
@@ -1138,7 +1190,7 @@ LegFrame.prototype.applyNetTorque = function() {
 
   for(var i = 0; i < this.legs.length; i++)
   {
-    if(this.legs[i].standing)
+    if(this.gait.isStanceLeg(i))
     {
       this.legs[i].joints[0].torque.subVectors(this.torqueLF, this.torqueSwing);
       this.legs[i].joints[0].torque.divideScalar(numberStanceLegs);

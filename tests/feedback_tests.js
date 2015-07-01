@@ -12,17 +12,34 @@ var extend = function(extended, base) {
 
 exports.setUp = function(callback)
 {
-  var IdleGait = function(phase) {
+  var DummyGait = function(phase) {
     this.base.call(this, phase);
   };
 
-  extend(IdleGait, bodies.Gait);
+  extend(DummyGait, bodies.Gait);
 
-  IdleGait.prototype.update = function(timeStep) {
+  DummyGait.prototype.update = function(timeStep) {
     this.targeFootPos[0] = 0;
-    this.targeFootPos[1] = -5.4;
+    this.targeFootPos[1] = -7.0;
     this.targeFootPos[2] = 0;
-  }
+  };
+
+  var TestGait = function() {
+  };
+
+  TestGait.prototype.setContactForLeg = function(i, contact) {
+  };
+
+  TestGait.prototype.update = function(timeStep) {
+  };
+
+  TestGait.prototype.isStanceLeg = function(i) {
+    return i == 0;
+  };
+
+  TestGait.prototype.getAnglesForLeg = function(i) {
+    return [0, 0, 0];
+  };
 
   var scene = new THREE.Scene();
   var collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
@@ -30,43 +47,39 @@ exports.setUp = function(callback)
   var overlappingPairCache = new Ammo.btDbvtBroadphase();
   var solver = new Ammo.btSequentialImpulseConstraintSolver();
   scene.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
-  scene.world.setGravity(new Ammo.btVector3(0,0,-20));
+  scene.world.setGravity(new Ammo.btVector3(0,0,-10));
   scene.world.bodies = [];
 
   /* trunk */
-  var mass = 2;
-  var trunk = new bodies.Bone(mass, new THREE.Vector3(1, 1, 2));
-  trunk.translate(0, 0, 5.4 + trunk.size.z + 0.5);
+  var mass = 1;
+  var trunk = new bodies.Bone(mass*70, new THREE.Vector3(1, 1, 2));
+  trunk.translate(0, 0, 6.4 + trunk.size.z + 0.5);
   trunk.buildAndInsert(scene);
 
   var pdGains = {
-    tracking: [1200, 30],
-    height: [0, 0],
-    velocity: [0, 0],
-    heading: [0, 0]
+    tracking: [1200, 30]
   };
 
   var fbGains = [
-    [0.12, 0.02],
+    [0.10, 0.10],
     [0, 0],
     [0, 0]
   ];
 
   this.stanceLeg = new bodies.RearLeg(trunk, 
                                       new THREE.Vector3(trunk.size.x, 0, -trunk.size.z),
-                                      [new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                                       new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                                       new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
-                                      new IdleGait(0.5),
+                                      [new bodies.Bone(mass*5, new THREE.Vector3(0.2, 0.2, 1.3)),
+                                       new bodies.Bone(mass*4, new THREE.Vector3(0.2, 0.2, 1.3)),
+                                       new bodies.Bone(mass, new THREE.Vector3(0.3, 0.1, 0.6))],
+                                      new DummyGait(0.5),
                                       pdGains);
-  this.stanceLeg.standing = true;
 
   this.swingLeg = new bodies.RearLeg(trunk, 
                                      new THREE.Vector3(-trunk.size.x, 0, -trunk.size.z),
-                                     [new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                                      new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                                      new bodies.Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
-                                     new IdleGait(0.0),
+                                     [new bodies.Bone(mass*5, new THREE.Vector3(0.2, 0.2, 1.3)),
+                                      new bodies.Bone(mass*4, new THREE.Vector3(0.2, 0.2, 1.3)),
+                                      new bodies.Bone(mass, new THREE.Vector3(0.3, 0.1, 0.6))],
+                                     new DummyGait(0.0),
                                      pdGains);
 
   var legs = [this.stanceLeg, this.swingLeg];
@@ -75,7 +88,7 @@ exports.setUp = function(callback)
     legs[i].buildAndInsert(scene);
   };
 
-  this.legFrame = new bodies.LegFrame(trunk, legs, pdGains, fbGains);
+  this.legFrame = new bodies.LegFrame(new TestGait(), trunk, legs, pdGains, fbGains);
 
   callback();
 };
