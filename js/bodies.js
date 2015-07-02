@@ -931,8 +931,8 @@ var Leg = function(trunk, pivot, segments, gait, pdGains) {
                 pivot,
                 segments[0],
                 new THREE.Vector3(0, 0, segments[0].size.z),
-                this.pdGains.tracking[0],
-                this.pdGains.tracking[1],
+                this.pdGains.joints[0][0],
+                this.pdGains.joints[0][1],
                 new THREE.Vector3(1, -Math.PI/4, 0),
                 new THREE.Vector3(0, Math.PI/4, 0),
                 true)
@@ -950,8 +950,8 @@ var Leg = function(trunk, pivot, segments, gait, pdGains) {
                 new THREE.Vector3(0, 0, -segments[i-1].size.z),
                 segments[i],
                 new THREE.Vector3(0, 0, segments[i].size.z),
-                this.pdGains.tracking[0],
-                this.pdGains.tracking[1],
+                this.pdGains.joints[i][0],
+                this.pdGains.joints[i][1],
                 new THREE.Vector3(1, 0, 0),
                 new THREE.Vector3(0, 0, 0),
                 false)
@@ -1226,7 +1226,7 @@ LegFrame.prototype.computeTorqueLF = function() {
   {
     var angle = 2*Math.asin(sinHalfAngle);
     var sign = (qDelta.w < 0) ? -1 : 1;
-    this.torqueLF.multiplyScalar(1/sinHalfAngle * angle * this.pdGains.tracking[0] * sign);
+    this.torqueLF.multiplyScalar(1/sinHalfAngle * angle * this.pdGains.legFrame[0] * sign);
   }
   else
   {
@@ -1236,7 +1236,7 @@ LegFrame.prototype.computeTorqueLF = function() {
   this.torqueLF.applyQuaternion(this.trunk.getOrientation());
 
   /* adds the derivative part */
-  this.torqueLF.add(omega.multiplyScalar(-this.pdGains.tracking[1]));
+  this.torqueLF.add(omega.multiplyScalar(-this.pdGains.legFrame[1]));
 
   if(this.torqueLF.length() > 200)
     this.torqueLF.multiplyScalar(200/this.torqueLF.length());

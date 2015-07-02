@@ -57,7 +57,12 @@ exports.setUp = function(callback)
   trunk.buildAndInsert(scene);
 
   var pdGains = {
-    tracking: [1200, 30]
+    legFrame: [6000, 1200],
+    joints: [
+      [1500, 300],
+      [1500, 300],
+      [1500, 300]
+    ],
   };
 
   var fbGains = [
