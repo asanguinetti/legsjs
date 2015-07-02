@@ -56,20 +56,30 @@ exports.setUp = function(callback)
   trunk.translate(0, 0, 6.4 + trunk.size.z + 0.5);
   trunk.buildAndInsert(scene);
 
-  var pdGains = {
-    legFrame: [6000, 1200],
+  var controlParams = {
+    legFrame: {
+      torqueLimit: 1000,
+      pdGains: [6000, 1200],
+      fbGains: [0, 0]
+    },
     joints: [
-      [1500, 300],
-      [1500, 300],
-      [1500, 300]
-    ],
-  };
-
-  var fbGains = [
-    [0.10, 0.10],
-    [0, 0],
-    [0, 0]
-  ];
+      {
+        torqueLimit: 1000,
+        pdGains: [1500, 300],
+        fbGains: [0.10, 0.10]
+      },
+      {
+        torqueLimit: 1000,
+        pdGains: [1500, 300],
+        fbGains: [0, 0]
+      },
+      {
+        torqueLimit: 1000,
+        pdGains: [1500, 300],
+        fbGains: [0, 0]
+      }
+    ]
+  }
 
   this.stanceLeg = new bodies.RearLeg(trunk, 
                                       new THREE.Vector3(trunk.size.x, 0, -trunk.size.z),
@@ -77,7 +87,7 @@ exports.setUp = function(callback)
                                        new bodies.Bone(mass*4, new THREE.Vector3(0.2, 0.2, 1.3)),
                                        new bodies.Bone(mass, new THREE.Vector3(0.3, 0.1, 0.6))],
                                       new DummyGait(0.5),
-                                      pdGains);
+                                      controlParams);
 
   this.swingLeg = new bodies.RearLeg(trunk, 
                                      new THREE.Vector3(-trunk.size.x, 0, -trunk.size.z),
@@ -85,7 +95,7 @@ exports.setUp = function(callback)
                                       new bodies.Bone(mass*4, new THREE.Vector3(0.2, 0.2, 1.3)),
                                       new bodies.Bone(mass, new THREE.Vector3(0.3, 0.1, 0.6))],
                                      new DummyGait(0.0),
-                                     pdGains);
+                                     controlParams);
 
   var legs = [this.stanceLeg, this.swingLeg];
 
@@ -93,7 +103,7 @@ exports.setUp = function(callback)
     legs[i].buildAndInsert(scene);
   };
 
-  this.legFrame = new bodies.LegFrame(new TestGait(), trunk, legs, pdGains, fbGains);
+  this.legFrame = new bodies.LegFrame(new TestGait(), trunk, legs, controlParams);
 
   callback();
 };
