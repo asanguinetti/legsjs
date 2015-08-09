@@ -4,6 +4,9 @@ if(typeof THREE === 'undefined')
 if(typeof Ammo === 'undefined')
   Ammo = require('./ammo.js');
 
+if(typeof SkeletalFigure === 'undefined')
+  SkeletalFigure = require('./skeletal_figure.js');
+
 var isZero = function(x) {
   var e = 0.0000000001;
   return -e < x && x < e;
@@ -65,128 +68,34 @@ var extend = function(extended, base) {
   extended.prototype.constructor = extended;
 };
 
-/**
- * Solves a planar inverse kinematic problem with 3 links and 3 rotational joints.
- * \param list q1 List of target joint angles starting from the closest to the 
- *                base (1st solution).
- * \param list q2 List of target joint angles starting from the closest to the 
- *                base (2nd solution).
- * \param list l List of link lengths conforming the chain, starting from 
- *               the closest to the base.
- * \param list p End-effector position and orientation.
- * \return list List of joint angles starting from the closest to the base.
- */
-var ikSolve = function(q1, q2, l, p) {
-  var w = [];
-
-  /* gets the position and angle of the wrist from the following equations.
-   * w_x = p_x - l_3*sin(phi)
-   * w_y = p_y + l_3*cos(phi)
-   * alpha = atan(-w_y/w_x) 
-   */
-  w[0] = p[0] - l[2]*Math.sin(p[2]);
-  w[1] = p[1] + l[2]*Math.cos(p[2]);
-  w[2] = Math.atan2(w[0], -w[1]);
-
-  /* gets the squared length of the wrist's position vector because it is used
-   * many times later
-   * we also cap it to the squared length of the arm */
-  w[3] = Math.min(w[0]*w[0] + w[1]*w[1], Math.pow(l[0] + l[1], 2));
-
-  /* gets q_2 as the supplement of beta which is itself calculated from the
-   * cosine theorem 
-   * q_2 = PI - beta
-   * l_1^2 + l_2^2 - 2*l_1*l_2*cos(beta) = w_x^2 + w_y^2
-   */
-  q1[1] = Math.PI - Math.acos((l[0]*l[0] + l[1]*l[1] - w[3])/(2*l[0]*l[1]));
-  q2[1] = -q1[1]
-
-
-  /* similarly:
-   * q_1 = alpha - gamma
-   * l_1^2 + w_x^2 + w_y^2 - 2*l_1*sqrt(w_x^2 + w_y^2)*cos(gamma) = l_2^2
-   */
-   q1[0] = w[2] - Math.acos((l[0]*l[0] - l[1]*l[1] + w[3])/(2*l[0]*Math.sqrt(w[3])));
-   q2[0] = 2*w[2] - q1[0];
-
-   /* finally:
-    * q_3 = phi - q_2 - q_1
-    */
-   q1[2] = p[2] - q1[1] - q1[0];
-   q2[2] = p[2] - q2[1] - q2[0];
-};
-
 var CollisionGroup = {
   NONE: 0,
   BONE: 1,
   GROUND: 2,
   MUSCLE: 4
-}
+};
 
 var Gait = function(phase) {
-  this.phase = phase;
-  /* FIXME: strike and take off positions are inverted */
-  this.swingCycle = 0.4;
-  this.period = 1.2;
-  this.velocity = 14;
-  this.targeFootPos = [0, 0, -Math.PI/8];
-  this.time = this.phase * this.period;
-  this.normalizedTime = this.phase;
+};
+
+Gait.prototype.setContactForLeg = function(i, contact) {
+  throw 'Operation not supported';
 };
 
 Gait.prototype.update = function(timeStep) {
-  this.time += timeStep;
-  this.time %= this.period;
-  this.normalizedTime = this.time / this.period;
-  if(this.normalizedTime < this.swingCycle) {
-    /* TODO: the strike position should include a velocity factor */
-    /* renormalizes the time for the swing cycle */
-    this.normalizedTime /= this.swingCycle;
-    /* linear interpolation between take off and strike positions */
-    this.targeFootPos[0] = this.normalizedTime*this.strikePosition + 
-                           (1 - this.normalizedTime)*this.takeOffPosition;
-    /* height uses an inverse parabola with roots at 0 and 1 */
-    this.targeFootPos[1] = (this.maxSwingHeight*27/4)*this.normalizedTime*this.normalizedTime*(1 - this.normalizedTime) - this.stanceHeight;
-    /* linear interpolation between take off and strike angles */
-    this.targeFootPos[2] = this.normalizedTime*this.strikeAngle + 
-                           (1 - this.normalizedTime)*this.takeOffAngle;
-  } else {
-    /* renormalizes the time for the stance cycle */
-    this.normalizedTime = (this.normalizedTime - this.swingCycle)/(1 - this.swingCycle);
-    /* linear interpolation between strike and take off positions */
-    this.targeFootPos[0] = this.normalizedTime*this.takeOffPosition + 
-                           (1 - this.normalizedTime)*this.strikePosition;
-    /* height uses an inverse parabola with roots at 0 and 1 */
-    this.targeFootPos[1] = -this.stanceHeight;
-    /* linear interpolation between strike and take off angles */
-    this.targeFootPos[2] = this.normalizedTime*this.takeOffAngle + 
-                           (1 - this.normalizedTime)*this.strikeAngle;
-  }
-}
-
-var FrontLegGait = function(phase) {
-  this.base.call(this, phase);
-  this.strikePosition = 2;
-  this.takeOffPosition = -2;
-  this.strikeAngle = Math.PI/4;
-  this.takeOffAngle = -Math.PI/4;
-  this.maxSwingHeight = 1.5;
-  this.stanceHeight = 4.5;
+  throw 'Operation not supported';
 };
 
-extend(FrontLegGait, Gait);
-
-var RearLegGait = function(phase) {
-  this.base.call(this, phase);
-  this.strikePosition = 1;
-  this.takeOffPosition = -3;
-  this.strikeAngle = Math.PI/4;
-  this.takeOffAngle = -Math.PI/4;
-  this.maxSwingHeight = 1;
-  this.stanceHeight = 4;
+Gait.prototype.isStanceLeg = function(i) {
+  return this.stateStanceLeg[this.state] == i;
 };
 
-extend(RearLegGait, Gait);
+Gait.prototype.getAnglesForLeg = function(i) {
+  if(this.isStanceLeg(i))
+    return this.stateTargets[this.state][1];
+  else
+    return this.stateTargets[this.state][0];
+};
 
 var WalkingGait = function() {
   this.state = 0;
@@ -212,6 +121,8 @@ var WalkingGait = function() {
   ];
 };
 
+extend(WalkingGait, Gait);
+
 WalkingGait.prototype.setContactForLeg = function(i, contact) {
   if((this.state == 1 && i == 1) || (this.state == 3 && i == 0)) {
     if(contact) {
@@ -231,17 +142,6 @@ WalkingGait.prototype.update = function(timeStep) {
       this.stateTime = 0;
     }
   }
-};
-
-WalkingGait.prototype.isStanceLeg = function(i) {
-  return this.stateStanceLeg[this.state] == i;
-};
-
-WalkingGait.prototype.getAnglesForLeg = function(i) {
-  if(this.isStanceLeg(i))
-    return this.stateTargets[this.state][1];
-  else
-    return this.stateTargets[this.state][0];
 };
 
 var RigidBody = function(mass, size) {
@@ -667,12 +567,12 @@ Trunk.prototype.buildVisual = function() {
   this.visual = visual;
 };
 
-var Joint = function(bodyA, pivotInA, bodyB, pivotInB, controlParams, 
+var Joint = function(skJoint, controlParams, 
                      angularLowerLimit, angularUpperLimit, absAngle) {
-  this.bodyA = bodyA;
-  this.bodyB = bodyB;
-  this.pivotInA = pivotInA;
-  this.pivotInB = pivotInB;
+  this.bodyA = skJoint.parentSegment.body;
+  this.bodyB = skJoint.childSegment.body;
+  this.pivotInA = (new THREE.Vector3()).fromArray(skJoint.snapPointParent);
+  this.pivotInB = (new THREE.Vector3()).fromArray(skJoint.snapPointChild);
   this.targetAngle = [0, 0, 0];
   this.controlParams = controlParams;
 
@@ -695,11 +595,6 @@ var Joint = function(bodyA, pivotInA, bodyB, pivotInB, controlParams,
   this.axis = [new THREE.Vector3(1, 0, 0), 
                new THREE.Vector3(0, 1, 0),
                new THREE.Vector3(0, 0, 1)];
-
-  /* some auxiliary vectors to reuse and avoid creating too many dynamic objects */
-  /* TODO: maybe it'd be better to use a pool? */
-  this.auxVec1 = new Ammo.btVector3();
-  this.auxVec2 = new Ammo.btVector3();
 };
 
 Joint.prototype.getPosition = function() {
@@ -732,34 +627,6 @@ Joint.prototype.getTorqueForVirtualForce = function(point, force) {
     }
   }
   return torque;
-};
-
-Joint.prototype.update = function(extraTorque) {
-  for(var i = 0; i < 3; i++) {
-    var jointAxis = this.c.getAxis(i);
-    this.auxVec1.setValue(jointAxis.x(), jointAxis.y(), jointAxis.z());
-    jointAxis = this.auxVec1;
-
-    /* calculates the relative angular velocity of the two objects */
-    var deltaOmega = this.bodyB.body.getAngularVelocity();
-    this.auxVec2.setValue(deltaOmega.x(), deltaOmega.y(), deltaOmega.z());
-    deltaOmega = this.auxVec2;
-    deltaOmega.op_sub(this.bodyA.body.getAngularVelocity());
-
-    /* calculates the projection of the relative angular velocity along the joint axis */
-    var jointVel = deltaOmega.dot(jointAxis);
-
-    /* calculates the torque to apply using PD */
-    var torqueScalar = this.controlParams.pdGains[0]*(this.targetAngle[i] + this.c.getAngle(i)) +
-                       this.controlParams.pdGains[1]*(0 - jointVel);
-    torqueScalar += extraTorque.getComponent(i);
-
-    /* applies the equal and opposite torques to both objects */
-    jointAxis.op_mul(torqueScalar);
-    this.bodyB.body.applyTorque(jointAxis);
-    jointAxis.op_mul(-1);
-    this.bodyA.body.applyTorque(jointAxis);
-  }
 };
 
 Joint.prototype.computeTargetQFromRelAngles = function(pitch, roll) {
@@ -900,61 +767,49 @@ Joint.prototype.buildAndInsert = function(scene) {
   scene.add(this.torqueArrow);
 };
 
-var Leg = function(trunk, pivot, segments, gait, controlParams) {
-  this.trunk = trunk;
-  this.pivot = pivot;
-  this.segments = segments;
-  this.standing = false;
-  this.gait = gait;
+var Leg = function(initialAngles, rootSkJoint, controlParams) {
+  this.trunk = rootSkJoint.parentSegment.body;
+  this.segments = [];
   this.joints = [];
   this.time = 0;
-  this.q1 = [];
-  this.q2 = [];
   this.controlParams = controlParams;
   this.footPos = new THREE.Vector3();
 
-  /* uses IK to get the initial orientations */
-  this.gait.update(0);
-  ikSolve(this.q1, this.q2,
-          [2*this.segments[0].size.z,
-           2*this.segments[1].size.z,
-           2*this.segments[2].size.z],
-          this.gait.targeFootPos);
-
-  /* adds the shoulder/hip joint */
+  /* adds the joints */
+  var absAngle = true;
+  skJoint = rootSkJoint;
   var xAxis = new THREE.Vector3(1, 0, 0);
-  var angle = this.q()[0];
-  segments[0].rotateAxis(xAxis, angle, new THREE.Vector3(0, 0, this.segments[0].size.z));
-  segments[0].snapTo(new THREE.Vector3(0, 0, segments[0].size.z), trunk, pivot);
-  this.joints.push(
-      new Joint(trunk,
-                pivot,
-                segments[0],
-                new THREE.Vector3(0, 0, segments[0].size.z),
-                this.controlParams.joints[0],
-                new THREE.Vector3(1, -Math.PI/4, 0),
-                new THREE.Vector3(0, Math.PI/4, 0),
-                true)
-  );
+  var i = 0;
+  var angle = 0;
+  while(true)
+  {
+    this.segments.push(skJoint.childSegment.body);
+    angle += initialAngles[i];
+    skJoint.childSegment.body.rotateAxis(xAxis, angle);
+    skJoint.childSegment.body.snapTo((new THREE.Vector3()).fromArray(skJoint.snapPointChild),
+                                     skJoint.parentSegment.body,
+                                     (new THREE.Vector3()).fromArray(skJoint.snapPointParent));
 
-  /* adds the rest of the joints */
-  for(var i = 1; i < segments.length; i++) {
-    angle += this.q()[i];
-    segments[i].rotateAxis(xAxis, angle, new THREE.Vector3(0, 0, this.segments[i].size.z));
-    segments[i].snapTo(new THREE.Vector3(0, 0, segments[i].size.z),
-                       segments[i-1],
-                       new THREE.Vector3(0, 0, -segments[i-1].size.z));
-    this.joints.push(
-      new Joint(segments[i - 1],
-                new THREE.Vector3(0, 0, -segments[i-1].size.z),
-                segments[i],
-                new THREE.Vector3(0, 0, segments[i].size.z),
-                this.controlParams.joints[i],
-                new THREE.Vector3(1, 0, 0),
-                new THREE.Vector3(0, 0, 0),
-                false)
-    );
-  }
+    var angularLowerLimit = new THREE.Vector3(1, -Math.PI/4, 0);
+    var angularUpperLimit = new THREE.Vector3(0, Math.PI/4, 0);
+
+    if(skJoint.type == SkeletalFigure.SkeletalJoint.types.HINGE)
+    {
+      angularLowerLimit = new THREE.Vector3(1, 0, 0);
+      angularUpperLimit = new THREE.Vector3(0, 0, 0);
+    }
+
+    this.joints.push(new Joint(skJoint,
+                               this.controlParams.joints[0],
+                               angularLowerLimit,
+                               angularUpperLimit,
+                               absAngle));
+    absAngle = false;
+    if(skJoint.childSegment.childrenJoints.length == 0)
+      break;
+    skJoint = skJoint.childSegment.childrenJoints[0];
+    i++;
+  };
 };
 
 Leg.prototype.buildAndInsert = function(scene) {
@@ -967,48 +822,6 @@ Leg.prototype.buildAndInsert = function(scene) {
   this.joints.forEach(function(joint) {
     joint.buildAndInsert(scene);
   });
-};
-
-Leg.prototype.update = function(timeStep, logger) {
-  this.gait.update(timeStep);
-  ikSolve(this.q1, this.q2,
-          [2*this.segments[0].size.z,
-           2*this.segments[1].size.z,
-           2*this.segments[2].size.z],
-          this.gait.targeFootPos);
-
-  var feetPos = new THREE.Vector3(0, 0, -this.segments[2].size.z);
-  feetPos = this.trunk.toWorldFrame(feetPos, feetPos);
-
-  /* calculates the force to help keeping the hip and shoulders height */
-  var pivotPosWorld = this.trunk.toWorldFrame(this.pivot);
-  var pivotVelWorld = this.trunk.getLinearVelocity(this.pivot);
-  var fh = new THREE.Vector3(0, 0, -this.controlParams.height[0]*(this.gait.stanceHeight - pivotPosWorld.z) + this.controlParams.height[1]*(0 - pivotVelWorld.z));
-
-  var zero = new THREE.Vector3(0, 0, 0)
-  var trunkCenterVel = this.trunk.getLinearVelocity(zero);
-  var trunkCenterPos = this.trunk.toWorldFrame(zero);
-  var fv = new THREE.Vector3(0, this.controlParams.velocity[0]*(this.gait.velocity - trunkCenterVel.y), 0);
-
-  var forward = new THREE.Vector3(0, 1, 0);
-  var curHeading = this.trunk.toWorldFrame(forward).sub(trunkCenterPos);
-  var deltaHeading = signedAngleTo(curHeading, forward);
-  var fHeading = this.trunk.toWorldFrame(new THREE.Vector3(-this.pivot.y, 0, 0)).sub(trunkCenterPos);
-  fHeading.normalize().multiplyScalar(this.controlParams.heading[0]*deltaHeading);
-
-  logger.setInfo('DeltaHeading', deltaHeading);
-
-  var balanceTorque = new THREE.Vector3();
-  for(var i = 0; i < this.joints.length; i++) {
-    balanceTorque.set(0, 0, 0);
-    if(this.standing) {
-      balanceTorque.add(this.joints[i].getTorqueForVirtualForce(pivotPosWorld, fh));
-      balanceTorque.add(this.joints[i].getTorqueForVirtualForce(trunkCenterPos, fv));
-      balanceTorque.add(this.joints[i].getTorqueForVirtualForce(feetPos, fHeading));
-    }
-    this.joints[i].targetAngle[0] = this.q()[i];
-    this.joints[i].update(balanceTorque);
-  };
 };
 
 Leg.prototype.computeTorques = function(targetAngles, bfP, bfD, bfGains) {
@@ -1037,35 +850,7 @@ Leg.prototype.getFootPos = function() {
   return this.footPos;
 };
 
-var FrontLeg = function(trunk, pivot, segments, gait, controlParams) {
-  this.base.call(this, trunk, pivot, segments, gait, controlParams);
-};
-
-FrontLeg.prototype = Object.create(Leg.prototype);
-FrontLeg.prototype.base = Leg;
-FrontLeg.prototype.constructor = FrontLeg;
-
-FrontLeg.prototype.q = function() {
-  return this.q1;
-};
-
-var RearLeg = function(trunk, pivot, segments, gait, controlParams) {
-  this.base.call(this, trunk, pivot, segments, gait, controlParams);
-};
-
-RearLeg.prototype = Object.create(Leg.prototype);
-RearLeg.prototype.base = Leg;
-RearLeg.prototype.constructor = RearLeg;
-
-RearLeg.prototype.q = function() {
-  return this.q2;
-};
-
-var LegFrame = function(gait, trunk, legs, controlParams) {
-  this.gait = gait;
-  this.trunk = trunk;
-  this.legs = legs;
-  this.controlParams = controlParams;
+var LegFrame = function(gait, rootSkSgmt, controlParams) {
   this.LFTransform = new THREE.Matrix4();
   this.LFEuler = new THREE.Euler();
   this.torqueLF = new THREE.Vector3();
@@ -1080,6 +865,15 @@ var LegFrame = function(gait, trunk, legs, controlParams) {
   var zero = new THREE.Vector3(0, 0, 0);
   var unit = new THREE.Vector3(1, 0, 0);
   this.torqueLFArrow = new THREE.ArrowHelper(unit, zero, 0, 0xff0000);
+
+  this.gait = gait;
+  this.controlParams = controlParams;
+  this.trunk = rootSkSgmt.body;
+  this.legs = [];
+  for(var i = 0; i < rootSkSgmt.childrenJoints.length; i++)
+    this.legs.push(new Leg(this.gait.getAnglesForLeg(i),
+                           rootSkSgmt.childrenJoints[i],
+                           controlParams));
 };
 
 LegFrame.prototype.update = function(timeStep) {
@@ -1166,7 +960,7 @@ LegFrame.prototype.computeFeedbackAngles = function() {
     this.fbP.set(0, 0, 0);
     this.fbD.set(0, 0, 0);
   }
-}
+};
 
 LegFrame.prototype.applyNetTorque = function() {
   var numberStanceLegs = 0;
@@ -1238,11 +1032,21 @@ LegFrame.prototype.computeTorqueLF = function() {
   if(this.torqueLF.length() > this.controlParams.legFrame.torqueLimit)
     this.torqueLF.multiplyScalar(this.controlParams.legFrame.torqueLimit/this.torqueLF.length());
   return this.torqueLF;
-}
+};
+
+LegFrame.prototype.buildAndInsert = function(scene) {
+  /* builds and inserts the trunk */
+  /* FIXME: this will cause problems if the trunk has already been built */
+  this.trunk.buildAndInsert(scene);
+  /* buils and inserts the legs */
+  this.legs.forEach(function(leg) {
+    leg.buildAndInsert(scene);
+  });
+
+  scene.add(this.torqueLFArrow);
+};
 
 module.exports.Bone = Bone;
 module.exports.Joint = Joint;
 module.exports.Gait = Gait;
-module.exports.RearLeg = RearLeg;
-module.exports.FrontLeg = FrontLeg;
 module.exports.LegFrame = LegFrame;

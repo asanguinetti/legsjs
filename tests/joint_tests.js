@@ -2,6 +2,7 @@ var assert = require('assert')
 var THREE = require('three');
 var bodies = require('../js/bodies.js');
 var testUtils = require('./test_utils.js');
+var SkeletalFigure = require('../js/skeletal_figure.js')
 
 
 var common = {};
@@ -18,19 +19,30 @@ exports.setUp = function(callback)
   scene.world.setGravity(new Ammo.btVector3(0,0,-20));
   scene.world.bodies = [];
 
-  this.bodyA = new bodies.Bone(0, new THREE.Vector3(0.2, 0.2, 1.0));
-  this.bodyB = new bodies.Bone(0, new THREE.Vector3(0.2, 0.2, 1.0));
+  var bodyA = new bodies.Bone(0, new THREE.Vector3(0.2, 0.2, 1.0));
+  var bodyB = new bodies.Bone(0, new THREE.Vector3(0.2, 0.2, 1.0));
 
-  this.bodyA.translate(0, 0, this.bodyA.size.z + this.bodyB.size.z);
+  bodyA.translate(0, 0, bodyA.size.z + bodyB.size.z);
 
-  this.bodyA.buildAndInsert(scene);
-  this.bodyB.buildAndInsert(scene);
+  bodyA.buildAndInsert(scene);
+  bodyB.buildAndInsert(scene);
 
-  this.pivotInA = new THREE.Vector3(0, 0, -this.bodyA.size.z);
-  this.pivotInB = new THREE.Vector3(0, 0, this.bodyB.size.z);
+  var pivotInA = [0, 0, -bodyA.size.z];
+  var pivotInB = [0, 0, bodyB.size.z];
 
-  this.pGain = 300;
-  this.dGain = 10;
+  var skSegA = new SkeletalFigure.SkeletalSegment(bodyA);
+  var skSegB = new SkeletalFigure.SkeletalSegment(bodyB);
+
+  skSegA.snap(SkeletalFigure.SkeletalJoint.types.BALLSOCKET,
+              skSegB, pivotInA, pivotInB);
+
+  this.skJoint = skSegA.childrenJoints[0];
+
+  this.controlParams = {
+    torqueLimit: 1000,
+    pdGains: [300, 10],
+    fbGains: [0.10, 0.10]
+  }
 
   this.angularLowerLimit = new THREE.Vector3(1, 0, 0);
   this.angularUpperLimit = new THREE.Vector3(0, 0, 0);
@@ -42,9 +54,7 @@ exports.setUp = function(callback)
 /* defines a group of tests for relative joints */
 exports.relative = {
   setUp: function(callback) {
-    this.joint = new bodies.Joint(this.bodyA, this.pivotInA,
-                                  this.bodyB, this.pivotInB,
-                                  this.pGain, this.dGain, 
+    this.joint = new bodies.Joint(this.skJoint, this.controlParams, 
                                   this.angularLowerLimit, this.angularUpperLimit,
                                   false);
     callback();
@@ -55,9 +65,7 @@ exports.relative = {
 /* defines a group of tests for absolute joints */
 exports.absolute = {
   setUp: function(callback) {
-    this.joint = new bodies.Joint(this.bodyA, this.pivotInA,
-                                  this.bodyB, this.pivotInB,
-                                  this.pGain, this.dGain, 
+    this.joint = new bodies.Joint(this.skJoint, this.controlParams, 
                                   this.angularLowerLimit, this.angularUpperLimit,
                                   true);
     callback();

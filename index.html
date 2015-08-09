@@ -9,7 +9,9 @@
   <script type="text/javascript" src="js/three.js"></script>
   <script type="text/javascript" src="js/ammo.js"></script>
   <script type="text/javascript" src="js/demo_utils.js"></script>
+  <script type="text/javascript" src="js/skeletal_figure.js"></script>
   <script type="text/javascript" src="js/bodies.js"></script>
+  <script type="text/javascript" src="js/skeletal_quadruped.js"></script>
   <script type="text/javascript" src="js/log.js"></script>
   
   <script type="text/javascript">
@@ -24,72 +26,58 @@
     var ground = new Ground(new THREE.Vector3(500, 500, 0.5));
     ground.buildAndInsert(demo.scene);
 
+    var skeletalFigure = SkeletalFigure.SkeletalSegment.fromJSON(SkeletalQuadruped);
+
     /* trunk */
-    var mass = 2;
-    var trunk = new Trunk(mass, new THREE.Vector3(3.5, 5, 2.5));
-    trunk.translate(0, 0, 10);
+    var trunk = skeletalFigure.body;
+    trunk.translate(0, 0, 5.4 + trunk.size.z + 0.5);
     trunk.buildAndInsert(demo.scene);
     demo.scene.camera.target = trunk;
 
     var controlParams = {
-      height: [0, 0],
-      velocity: [0, 0],
-      heading: [2000, 0],
+      legFrame: {
+        torqueLimit: 1000,
+        pdGains: [6000, 1200],
+        fbGains: [0, 0]
+      },
       joints: [
         {
           torqueLimit: 1000,
-          pdGains: [2000, 60],
-          fbGains: [0.10, 0.10]
+          pdGains: [1500, 300],
+          fbGains: [0.16, 0.16]
         },
         {
           torqueLimit: 1000,
-          pdGains: [2000, 60],
+          pdGains: [1500, 300],
           fbGains: [0, 0]
         },
         {
           torqueLimit: 1000,
-          pdGains: [2000, 60],
+          pdGains: [1500, 300],
           fbGains: [0, 0]
         }
       ]
     }
 
-    var legFL = new FrontLeg(trunk, 
-                             new THREE.Vector3(-trunk.size.x, trunk.size.y, -trunk.size.z),
-                             [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
-                             new FrontLegGait(0.0),
-                             controlParams);
+    var legFrames = [];
+    for(var i = 0; i < skeletalFigure.childrenJoints.length; i++)
+    {
+      /* FIXME: shouldn't have to do all this manually */
+      var skJoint = skeletalFigure.childrenJoints[i];
+      var rootSeg = skJoint.childSegment;
+      rootSeg.body.snapTo((new THREE.Vector3()).fromArray(skJoint.snapPointChild),
+                          skJoint.parentSegment.body,
+                          (new THREE.Vector3()).fromArray(skJoint.snapPointParent));
+      var legFrame = new LegFrame(new WalkingGait(), rootSeg, controlParams);
+      legFrame.buildAndInsert(demo.scene);
+      legFrames.push(legFrame);
 
-    var legFR = new FrontLeg(trunk, 
-                             new THREE.Vector3(trunk.size.x, trunk.size.y, -trunk.size.z),
-                             [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                              new Bone(mass, new THREE.Vector3(0.2, 0.2, 0.7))],
-                             new FrontLegGait(0.5),
-                             controlParams);
-
-    var legRL = new RearLeg(trunk, 
-                            new THREE.Vector3(-trunk.size.x, -trunk.size.y, -trunk.size.z),
-                            [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                             new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                             new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.2))],
-                            new RearLegGait(0.35),
-                            controlParams);
-
-    var legRR = new RearLeg(trunk, 
-                            new THREE.Vector3(trunk.size.x, -trunk.size.y, -trunk.size.z),
-                            [new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                             new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.0)),
-                             new Bone(mass, new THREE.Vector3(0.2, 0.2, 1.2))],
-                            new RearLegGait(0.85),
-                            controlParams);
-
-    var legs = [legFL, legFR, legRL, legRR];
-    legs.forEach(function(leg) {
-      leg.buildAndInsert(demo.scene);
-    });
+      var joint = new Joint(skJoint, controlParams.joints[0], 
+                            new THREE.Vector3(1, -0.1, -0.1),
+                            new THREE.Vector3(0, 0.1, 0.1),
+                            false);
+      joint.buildAndInsert(demo.scene);
+    }
 
     /* sets a callback for updating the torques on the joints */
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
@@ -115,18 +103,24 @@
             continue;
 
           /* finds if any of the feet is the other object */
-          legs.forEach(function(leg) {
-            if(Ammo.compare(leg.segments[leg.segments.length - 1].body, legSegment))
-            {
-              leg.standing = true;
-              return false;
+          legFrames.forEach(function(legFrame) {
+            for(var j = 0; j < legFrame.legs.length; j++) {
+              var leg = legFrame.legs[j];
+              if(Ammo.compare(leg.segments[leg.segments.length - 1].body, legSegment))
+              {
+                legFrame.gait.setContactForLeg(j, true);
+                break;
+              }
             }
           });
       }
 
-      legs.forEach(function(leg) {
-        leg.update(timeStep, logger);
-        leg.standing = false;
+      legFrames.forEach(function(legFrame) {
+        legFrame.update(timeStep);
+
+        for(var i = 0; i < legFrame.legs.length; i++) {
+          legFrame.gait.setContactForLeg(i, false);
+        }
       });
     });
 
