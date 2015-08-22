@@ -800,7 +800,7 @@ var Leg = function(initialAngles, rootSkJoint, controlParams) {
     }
 
     this.joints.push(new Joint(skJoint,
-                               this.controlParams.joints[0],
+                               this.controlParams.joints[i],
                                angularLowerLimit,
                                angularUpperLimit,
                                absAngle));
@@ -824,15 +824,16 @@ Leg.prototype.buildAndInsert = function(scene) {
   });
 };
 
-Leg.prototype.computeTorques = function(targetAngles, bfP, bfD, bfGains) {
+Leg.prototype.computeTorques = function(targetAngles, fbP, fbD) {
   /* computes the character orientation (heading of trunk) */
   var charFrame = new THREE.Quaternion();
   charFrame.copy(this.trunk.getHeading());
 
   /* computes the torques for all the joints */
   for(var i = 0; i < this.joints.length; i++) {
-    var pitch = bfP.y * bfGains[0] + bfD.y * bfGains[1] + targetAngles[i];
-    var roll = -bfP.x * bfGains[0] - bfD.x * bfGains[1];
+    var fbGains = this.joints[i].controlParams.fbGains;
+    var pitch = fbP.y * fbGains[0] + fbD.y * fbGains[1] + targetAngles[i];
+    var roll = -fbP.x * fbGains[0] - fbD.x * fbGains[1];
     this.joints[i].computeTargetQFromRelAngles(pitch, roll);
     this.joints[i].computeTorque(charFrame);
   }
@@ -887,10 +888,10 @@ LegFrame.prototype.update = function(timeStep) {
   {
     if(this.gait.isStanceLeg(i))
       this.legs[i].computeTorques(this.gait.getAnglesForLeg(i),
-                                  zero, zero, this.controlParams.joints[i].fbGains);
+                                  zero, zero);
     else
       this.legs[i].computeTorques(this.gait.getAnglesForLeg(i),
-                                  this.fbP, this.fbD, this.controlParams.joints[i].fbGains);
+                                  this.fbP, this.fbD);
   }
 
   this.applyNetTorque();
