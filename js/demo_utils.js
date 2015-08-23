@@ -179,7 +179,7 @@ Demo.prototype.updateCamera = function()
 Demo.prototype.updatePhysics = function() {
     /* steps world */
     this.time_delta = Date.now() - this.time_last;
-    this.scene.world.stepSimulation(this.time_delta / 1000.0, 1500, 1 / 1000);
+    this.scene.world.stepSimulation(this.time_delta / 1000.0, 1500, 1 / 2000);
     this.time_last += this.time_delta;
 };
 

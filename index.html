@@ -30,36 +30,43 @@
 
     /* trunk */
     var trunk = skeletalFigure.body;
-    trunk.translate(0, 0, 5.4 + trunk.size.z + 0.5);
+    trunk.translate(0, 0, 3.8 + trunk.size.z);
     trunk.buildAndInsert(demo.scene);
     demo.scene.camera.target = trunk;
 
     var controlParams = {
       legFrame: {
         torqueLimit: 1000,
-        pdGains: [6000, 1200],
+        pdGains: [3000, 500],
         fbGains: [0, 0]
       },
       joints: [
         {
           torqueLimit: 1000,
-          pdGains: [1500, 300],
-          fbGains: [0.16, 0.16]
+          pdGains: [1500, 100],
+          fbGains: [0.10, 0.10]
         },
         {
           torqueLimit: 1000,
-          pdGains: [1500, 300],
+          pdGains: [1500, 100],
           fbGains: [0, 0]
         },
         {
           torqueLimit: 1000,
-          pdGains: [1500, 300],
+          pdGains: [1500, 100],
+          fbGains: [0, 0]
+        },
+        {
+          torqueLimit: 1000,
+          pdGains: [800, 80],
           fbGains: [0, 0]
         }
       ]
     }
 
     var legFrames = [];
+    var gaits = [new QuadrupedWalkingGaitFront(),
+                 new QuadrupedWalkingGaitRear()];
     for(var i = 0; i < skeletalFigure.childrenJoints.length; i++)
     {
       /* FIXME: shouldn't have to do all this manually */
@@ -68,13 +75,13 @@
       rootSeg.body.snapTo((new THREE.Vector3()).fromArray(skJoint.snapPointChild),
                           skJoint.parentSegment.body,
                           (new THREE.Vector3()).fromArray(skJoint.snapPointParent));
-      var legFrame = new LegFrame(new WalkingGait(), rootSeg, controlParams);
+      var legFrame = new LegFrame(gaits[i], rootSeg, controlParams);
       legFrame.buildAndInsert(demo.scene);
       legFrames.push(legFrame);
 
       var joint = new Joint(skJoint, controlParams.joints[0], 
-                            new THREE.Vector3(1, -0.1, -0.1),
-                            new THREE.Vector3(0, 0.1, 0.1),
+                            new THREE.Vector3(-0.1, -0.1, -0.1),
+                            new THREE.Vector3(0.1, 0.1, 0.1),
                             false);
       joint.buildAndInsert(demo.scene);
     }

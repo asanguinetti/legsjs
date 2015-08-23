@@ -61,7 +61,7 @@
       ]
     }
 
-    var legFrame = new LegFrame(new WalkingGait(), skeletalFigure, controlParams);
+    var legFrame = new LegFrame(new BipedWalkingGait(), skeletalFigure, controlParams);
     legFrame.buildAndInsert(demo.scene);
 
     /* sets a callback for updating the torques on the joints */
