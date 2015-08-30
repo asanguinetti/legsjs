@@ -1,3 +1,8 @@
+// This file is not an official build. It has been built specifically for this
+// application, adding more functions to the Javascript binding. The IDL file
+// is provided under ammo.idl.
+// Additionally a modification has been made directly to this file at the end
+// to allow usage from scripts executed with NodeJS.
 
 // This is ammo.js, a port of Bullet Physics to JavaScript. zlib licensed.
 var Ammo = (function() {
@@ -63,6 +68,7 @@ var Nb=[wM,wM,JH,wM,KH,wM,LH,wM,MH,wM,NH,wM,Uq,hr,mw,vw,WA,ax,jy,qy,Iy,Sy,lD,wE,
   return this;
 }).call({});
 
+// Modification to allow using from NodeJS
 if ( typeof module === 'object' ) {
   module.exports.Ammo = Ammo;
 }

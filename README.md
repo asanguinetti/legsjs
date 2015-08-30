@@ -1,1 +1,6 @@
-Demo of a quadruped creature's walking motion with simulated physics.
+LegsJS
+======
+
+A Javascript framework for physics based animation of virtual characters.
+
+**Under construction.
