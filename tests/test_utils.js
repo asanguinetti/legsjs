@@ -1,4 +1,4 @@
-var THREE = require('three');
+var THREE = require('../src/third_party/three.js');
 
 module.exports = {
   isNearZero: function(x) {

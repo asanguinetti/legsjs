@@ -1,6 +1,6 @@
 var assert = require('assert')
-var THREE = require('three');
-var bodies = require('../js/bodies.js');
+var THREE = require('../src/third_party/three.js');
+var model = require('../src/model/model.js');
 var testUtils = require('./test_utils.js');
 
 
@@ -18,7 +18,7 @@ exports.setUp = function(callback)
   scene.world.setGravity(new Ammo.btVector3(0,0,-10));
   scene.world.bodies = [];
 
-  this.rb = new bodies.Bone(0, new THREE.Vector3(0.5, 0.5, 0.5));
+  this.rb = new model.Bone(0, new THREE.Vector3(0.5, 0.5, 0.5));
 
   this.rb.buildAndInsert(scene);
 

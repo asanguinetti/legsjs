@@ -3,33 +3,33 @@
 <html>
 
 <head>
-  <title>Biped Test - Axel Sanguinetti</title>
+  <title>Biped Demo - Axel Sanguinetti</title>
   
-  <script type="text/javascript" src="js/node_dummy.js"></script>
-  <script type="text/javascript" src="js/three.js"></script>
-  <script type="text/javascript" src="js/ammo.js"></script>
+  <script type="text/javascript" src="../src/third_party/three.js"></script>
+  <script type="text/javascript" src="../src/third_party/ammo.js"></script>
   <script type="text/javascript" src="js/demo_utils.js"></script>
-  <script type="text/javascript" src="js/skeletal_figure.js"></script>
-  <script type="text/javascript" src="js/bodies.js"></script>
+  <script type="text/javascript" src="../build/legs.js"></script>
   <script type="text/javascript" src="js/skeletal_biped.js"></script>
-  <script type="text/javascript" src="js/log.js"></script>
+  <script type="text/javascript" src="js/biped_gaits.js"></script>
   
   <script type="text/javascript">
   
   'use strict';
 
+  var Legs = require('legs');
+
   var initScene = function() {
     var demo = new Demo(document.getElementById('viewport'));
-    var logger = new NullLogger();
+    var logger = new Legs.Log.NullLogger();
 
     var gravity = 10;
     demo.scene.world.setGravity(new Ammo.btVector3(0, 0, -gravity));
 
     /* ground */
-    var ground = new Ground(new THREE.Vector3(500, 500, 0.5));
+    var ground = new Legs.Model.Ground(new THREE.Vector3(500, 500, 0.5));
     ground.buildAndInsert(demo.scene);
 
-    var skeletalFigure = SkeletalFigure.SkeletalSegment.fromJSON(SkeletalBiped);
+    var skeletalFigure = Legs.SkeletalFigure.SkeletalSegment.fromJSON(SkeletalBiped);
 
     /* trunk */
     var trunk = skeletalFigure.body;
@@ -61,8 +61,9 @@
       ]
     }
 
-    var legFrame = new LegFrame(new BipedWalkingGait(), skeletalFigure, controlParams);
-    legFrame.buildAndInsert(demo.scene);
+    var legFrame = new Legs.Control.LegFrame(new BipedWalkingGait(),
+                                             skeletalFigure, controlParams);
+    skeletalFigure.buildAndInsert(demo.scene);
 
     /* sets a callback for updating the torques on the joints */
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {

@@ -38,3 +38,8 @@ extend(NullLogger, Logger);
 NullLogger.prototype.log = function(msg) {
   /* does nothing */
 };
+
+if ( typeof module === 'object' ) {
+  module.exports.ConsoleLogger = ConsoleLogger;
+  module.exports.NullLogger = NullLogger;
+}

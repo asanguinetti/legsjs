@@ -63,4 +63,6 @@ var Nb=[wM,wM,JH,wM,KH,wM,LH,wM,MH,wM,NH,wM,Uq,hr,mw,vw,WA,ax,jy,qy,Iy,Sy,lD,wE,
   return this;
 }).call({});
 
-module.exports.Ammo = Ammo;
+if ( typeof module === 'object' ) {
+  module.exports.Ammo = Ammo;
+}

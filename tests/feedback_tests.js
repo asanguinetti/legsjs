@@ -1,8 +1,8 @@
 var assert = require('assert')
-var THREE = require('three');
-var bodies = require('../js/bodies.js');
+var THREE = require('../src/third_party/three.js');
+var control = require('../src/control/control.js');
 var testUtils = require('./test_utils.js');
-var SkeletalFigure = require('../js/skeletal_figure.js')
+var SkeletalFigure = require('../src/skeletal_figure.js')
 var TestSkeletalBiped = require('./test_skeletal_biped.js')
 
 exports.setUp = function(callback)
@@ -66,10 +66,10 @@ exports.setUp = function(callback)
     ]
   }
 
-  this.legFrame = new bodies.LegFrame(new TestGait(),
-                                      skeletalFigure,
-                                      controlParams);
-  this.legFrame.buildAndInsert(scene);
+  this.legFrame = new control.LegFrame(new TestGait(),
+                                       skeletalFigure,
+                                       controlParams);
+  skeletalFigure.buildAndInsert(scene);
 
   this.swingLeg = this.legFrame.legs[1];
 
