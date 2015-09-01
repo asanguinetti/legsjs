@@ -69,6 +69,10 @@ var RigidBody = function(mass, size) {
   this.vel = new THREE.Vector3();
   this.omega = new THREE.Vector3();
   this.btTransformAux = new Ammo.btTransform();
+
+  /* TODO: use a pool instead of this */
+  this.btVecAux = new Ammo.btVector3();
+  this.btVecAux2 = new Ammo.btVector3();
 };
 
 RigidBody.prototype.translate = function(x, y, z) {
@@ -96,7 +100,10 @@ RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
   if(worldPoint === undefined)
     p = new THREE.Vector3();
 
-  p.copy(localPoint);
+  if(localPoint === undefined)
+    p.set(0, 0, 0);
+  else
+    p.copy(localPoint);
 
   var t = this.btTransform;
   if(this.body !== undefined)
@@ -201,7 +208,16 @@ RigidBody.prototype.snapTo = function(snapPoint, bodyB, snapPointB) {
   this.translate(worldSnapPointB.x - worldSnapPoint.x, 
                  worldSnapPointB.y - worldSnapPoint.y, 
                  worldSnapPointB.z - worldSnapPoint.z);
-}
+};
+
+RigidBody.prototype.applyForce = function(force, relPos) {
+  this.btVecAux.setValue(force.x, force.y, force.z);
+  if(relPos === undefined)
+    this.btVecAux2.setValue(0, 0, 0);
+  else
+    this.btVecAux2.setValue(relPos.x, relPos.y, relPos.z);
+  this.body.applyForce(this.btVecAux, this.btVecAux2);
+};
 
 RigidBody.prototype.buildAndInsert = function(scene) {
   this.buildRigidBody();
@@ -211,7 +227,7 @@ RigidBody.prototype.buildAndInsert = function(scene) {
 
   this.buildVisual();
   scene.add(this.visual);
-}
+};
 
 RigidBody.prototype.updateVisual = function() {
   if( this.body.getMotionState() && this.visual !== undefined ) {
@@ -225,7 +241,7 @@ RigidBody.prototype.updateVisual = function() {
                                this.btTransformAux.getRotation().z(), 
                                this.btTransformAux.getRotation().w());
   }
-}
+};
 
 RigidBody.prototype.buildRigidBody = function() {
   throw "Unsupported operation";

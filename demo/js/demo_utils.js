@@ -201,6 +201,23 @@ Demo.prototype.animate = function() {
   this.scene.renderer.render(this.scene, this.scene.camera);
 };
 
+var Force = function() {
+  this.arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0),
+                                     new THREE.Vector3(0, 0, 0),
+                                     0);
+};
+
+Force.prototype.applyTo = function(body, force, relPos) {
+  body.toWorldFrame(relPos, this.arrow.position);
+  this.arrow.setLength(force.length());
+  this.arrow.setDirection(force.clone().normalize());
+  body.applyForce(force, relPos);
+};
+
+Force.prototype.buildAndInsert = function(scene) {
+  scene.add(this.arrow);
+}
+
 var DebugDrawer = function() {
   var wrappedFrom;
   var wrappedTo;

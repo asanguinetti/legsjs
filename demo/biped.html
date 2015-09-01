@@ -65,12 +65,17 @@
                                              skeletalFigure, controlParams);
     skeletalFigure.buildAndInsert(demo.scene);
 
+    var force = new Force();
+    force.buildAndInsert(demo.scene);
+
     /* sets a callback for updating the torques on the joints */
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
       demo.scene.world.clearForces();
       demo.scene.world.bodies.forEach(function(b) {
         b.body.applyGravity();
       });
+      if(window.location.hash === '#forces')
+        force.applyTo(trunk, new THREE.Vector3(10, 20, 0));
 
       /* iterates over the contact manifolds to check if any leg is touching the ground */
       var numManifolds = demo.scene.world.getDispatcher().getNumManifolds();
