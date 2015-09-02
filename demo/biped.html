@@ -4,6 +4,43 @@
 
 <head>
   <title>Biped Demo - Axel Sanguinetti</title>
+
+  <style type="text/css">
+    #info-box {
+      position: absolute;
+      top: 18px;
+      right: 10px;
+    }
+
+    #info-box > div {
+      background-color: rgba(10, 10, 10, 0.8);
+      border: 2px solid black;
+      border-radius: 10px;
+      padding: 20px;
+      width: 200px;
+    }
+
+    #info-box input {
+      border-radius: 4px;
+      margin-left: 5px;
+      width: 80%;
+    }
+
+    #info-box label {
+      font: bold 15px "Courier New", monospace;
+      color: white;
+      display: inline-block;
+      text-align: right;
+    }
+
+    #info-box, #info-box > div {
+      visibility: hidden;
+    }
+
+    #info-box > div:target {
+      visibility: visible;
+    }
+  </style>
   
   <script type="text/javascript" src="../src/third_party/three.js"></script>
   <script type="text/javascript" src="../src/third_party/ammo.js"></script>
@@ -74,8 +111,17 @@
       demo.scene.world.bodies.forEach(function(b) {
         b.body.applyGravity();
       });
+
+      /* TODO: avoid accessing the arrow like this */
+      force.arrow.visible = false;
       if(window.location.hash === '#forces')
-        force.applyTo(trunk, new THREE.Vector3(10, 20, 0));
+      {
+        var inputs = document.querySelectorAll("#forces input");
+        force.applyTo(trunk, new THREE.Vector3(parseInt(inputs[0].value),
+                                               parseInt(inputs[1].value),
+                                               parseInt(inputs[2].value)));
+        force.arrow.visible = true;
+      }
 
       /* iterates over the contact manifolds to check if any leg is touching the ground */
       var numManifolds = demo.scene.world.getDispatcher().getNumManifolds();
@@ -123,6 +169,19 @@
 
 <body>
   <div id="viewport"></div>
+  <div id="info-box">
+    <div id="forces">
+      <p>
+        <label>X = </label><input value="30" />
+      </p>
+      <p>
+        <label>Y = </label><input value="20" />
+      </p>
+      <p>
+        <label>Z = </label><input value="0" />
+      </p>
+    </div>
+  </div>
 </body>
 
 </html>
