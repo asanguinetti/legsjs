@@ -4,6 +4,8 @@
 
 <head>
   <title>Quadruped Demo - Axel Sanguinetti</title>
+
+  <link rel="stylesheet" type="text/css" href="css/demo.css">
   
   <script type="text/javascript" src="../src/third_party/three.js"></script>
   <script type="text/javascript" src="../src/third_party/ammo.js"></script>
@@ -75,12 +77,29 @@
     }
     skeletalFigure.buildAndInsert(demo.scene);
 
+    var force = new Force();
+    force.buildAndInsert(demo.scene);
+
     /* sets a callback for updating the torques on the joints */
+    var t = 0;
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
+      t += timeStep;
       demo.scene.world.clearForces();
       demo.scene.world.bodies.forEach(function(b) {
         b.body.applyGravity();
       });
+
+      force.hide();
+      if(window.location.hash === '#forces')
+      {
+        var inputs = document.querySelectorAll("#forces input");
+        /* using eval here is not considered a problem, since the user can
+         * always use the browser's console to execute whatever code he wants */
+        force.applyTo(trunk, new THREE.Vector3(eval(inputs[0].value),
+                                               eval(inputs[1].value),
+                                               eval(inputs[2].value)));
+        force.show();
+      }
 
       /* iterates over the contact manifolds to check if any leg is touching the ground */
       var numManifolds = demo.scene.world.getDispatcher().getNumManifolds();
@@ -132,6 +151,19 @@
 
 <body>
   <div id="viewport"></div>
+  <div id="info-box">
+    <div id="forces">
+      <p>
+        <label>X = </label><input value="300*Math.sin(t)*Math.sin(t*10)" />
+      </p>
+      <p>
+        <label>Y = </label><input value="100*Math.cos(2*t)" />
+      </p>
+      <p>
+        <label>Z = </label><input value="0" />
+      </p>
+    </div>
+  </div>
 </body>
 
 </html>

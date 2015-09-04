@@ -5,42 +5,7 @@
 <head>
   <title>Biped Demo - Axel Sanguinetti</title>
 
-  <style type="text/css">
-    #info-box {
-      position: absolute;
-      top: 18px;
-      right: 10px;
-    }
-
-    #info-box > div {
-      background-color: rgba(10, 10, 10, 0.8);
-      border: 2px solid black;
-      border-radius: 10px;
-      padding: 20px;
-      width: 200px;
-    }
-
-    #info-box input {
-      border-radius: 4px;
-      margin-left: 5px;
-      width: 80%;
-    }
-
-    #info-box label {
-      font: bold 15px "Courier New", monospace;
-      color: white;
-      display: inline-block;
-      text-align: right;
-    }
-
-    #info-box, #info-box > div {
-      visibility: hidden;
-    }
-
-    #info-box > div:target {
-      visibility: visible;
-    }
-  </style>
+  <link rel="stylesheet" type="text/css" href="css/demo.css">
   
   <script type="text/javascript" src="../src/third_party/three.js"></script>
   <script type="text/javascript" src="../src/third_party/ammo.js"></script>
@@ -118,6 +83,8 @@
       if(window.location.hash === '#forces')
       {
         var inputs = document.querySelectorAll("#forces input");
+        /* using eval here is not considered a problem, since the user can
+         * always use the browser's console to execute whatever code he wants */
         force.applyTo(trunk, new THREE.Vector3(eval(inputs[0].value),
                                                eval(inputs[1].value),
                                                eval(inputs[2].value)));
