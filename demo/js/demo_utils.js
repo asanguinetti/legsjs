@@ -214,9 +214,17 @@ Force.prototype.applyTo = function(body, force, relPos) {
   body.applyForce(force, relPos);
 };
 
+Force.prototype.show = function() {
+  this.arrow.visible = true;
+};
+
+Force.prototype.hide = function() {
+  this.arrow.visible = false;
+};
+
 Force.prototype.buildAndInsert = function(scene) {
   scene.add(this.arrow);
-}
+};
 
 var DebugDrawer = function() {
   var wrappedFrom;

@@ -106,21 +106,22 @@
     force.buildAndInsert(demo.scene);
 
     /* sets a callback for updating the torques on the joints */
+    var t = 0;
     var fp = Ammo.Runtime.addFunction(function(world, timeStep) {
+      t += timeStep;
       demo.scene.world.clearForces();
       demo.scene.world.bodies.forEach(function(b) {
         b.body.applyGravity();
       });
 
-      /* TODO: avoid accessing the arrow like this */
-      force.arrow.visible = false;
+      force.hide();
       if(window.location.hash === '#forces')
       {
         var inputs = document.querySelectorAll("#forces input");
-        force.applyTo(trunk, new THREE.Vector3(parseInt(inputs[0].value),
-                                               parseInt(inputs[1].value),
-                                               parseInt(inputs[2].value)));
-        force.arrow.visible = true;
+        force.applyTo(trunk, new THREE.Vector3(eval(inputs[0].value),
+                                               eval(inputs[1].value),
+                                               eval(inputs[2].value)));
+        force.show();
       }
 
       /* iterates over the contact manifolds to check if any leg is touching the ground */
@@ -172,10 +173,10 @@
   <div id="info-box">
     <div id="forces">
       <p>
-        <label>X = </label><input value="30" />
+        <label>X = </label><input value="300*Math.sin(t)*Math.sin(t*10)" />
       </p>
       <p>
-        <label>Y = </label><input value="20" />
+        <label>Y = </label><input value="200*Math.cos(2*t)" />
       </p>
       <p>
         <label>Z = </label><input value="0" />
