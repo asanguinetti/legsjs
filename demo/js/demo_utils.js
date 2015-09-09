@@ -159,9 +159,13 @@ Demo.prototype.onMouseWheel = function(event) {
 };
 
 Demo.prototype.onMouseDown = function(event) {
-  /* TODO: take the mass, size and velocity from user input */
-  if(window.location.hash === '#throw')
-    this.throwBox(4, new THREE.Vector3(1, 1, 1), 60);
+  if(window.location.hash === '#throw') {
+    var throwParams = document.getElementById("throw");
+    var mass = parseFloat(throwParams.querySelector("input[name=mass]").value);
+    var size = parseFloat(throwParams.querySelector("input[name=size]").value);
+    var velocity = parseFloat(throwParams.querySelector("input[name=velocity]").value);
+    this.throwBox(mass, new THREE.Vector3(size, size, size), velocity);
+  }
 };
 
 Demo.prototype.updateCamera = function()
