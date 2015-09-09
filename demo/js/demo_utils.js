@@ -75,6 +75,8 @@ Demo.prototype.setUpScene = function(viewport) {
   light.shadowDarkness = .7;
   this.scene.add(light);
 
+  this.raycaster = new THREE.Raycaster();
+
   this.thrownBoxes = [];
 };
 
@@ -160,11 +162,32 @@ Demo.prototype.onMouseWheel = function(event) {
 
 Demo.prototype.onMouseDown = function(event) {
   if(window.location.hash === '#throw') {
+    event.preventDefault();
+    var x;
+    var y;
+
+    /* gets the mouse click coordinates */
+    if(event.clientX) {
+      x = event.clientX+document.body.scrollLeft;
+      y = event.clientY+document.body.scrollTop;
+    } else if(event.pageX) {
+      x = event.pageX+window.pageXOffset;
+      y = event.pageY+window.pageYOffset;
+    }
+
+    /* normalizes the coordinates between -1 and 1 */
+    x = (x / window.innerWidth) * 2 - 1;
+    y = -(y / window.innerHeight) * 2 + 1;
+
+    /* builds a ray from the camera to a point in infinity */
+    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.scene.camera);
+
     var throwParams = document.getElementById("throw");
     var mass = parseFloat(throwParams.querySelector("input[name=mass]").value);
     var size = parseFloat(throwParams.querySelector("input[name=size]").value);
     var velocity = parseFloat(throwParams.querySelector("input[name=velocity]").value);
-    this.throwBox(mass, new THREE.Vector3(size, size, size), velocity);
+    this.throwBox(mass, new THREE.Vector3(size, size, size),
+                  velocity, this.raycaster.ray.direction);
   }
 };
 
@@ -216,7 +239,7 @@ Demo.prototype.animate = function() {
   this.scene.renderer.render(this.scene, this.scene.camera);
 };
 
-Demo.prototype.throwBox = function(mass, size, velocity) {
+Demo.prototype.throwBox = function(mass, size, velocity, direction) {
   /* reuses the Bone model for the boxes */
   var box = new Legs.Model.Bone(mass, size);
 
@@ -233,9 +256,7 @@ Demo.prototype.throwBox = function(mass, size, velocity) {
   /* builds the box and inserts it into the scene */
   box.buildAndInsert(this.scene);
 
-  var dir = new THREE.Vector3();
-  dir.subVectors(this.scene.camera.target.visual.position,
-                 this.scene.camera.position);
+  var dir = direction.clone();
   dir.normalize();
   dir.multiplyScalar(velocity);
   box.body.setLinearVelocity(new Ammo.btVector3(dir.x, dir.y, dir.z));
@@ -244,6 +265,7 @@ Demo.prototype.throwBox = function(mass, size, velocity) {
   this.thrownBoxes.push(box);
 
   /* if it has too many boxes, it removes the oldest one */
+  /* FIXME: the collision object should also be removed */
   if(this.thrownBoxes.length > 10)
     this.scene.remove(this.thrownBoxes.shift().visual);
 };
