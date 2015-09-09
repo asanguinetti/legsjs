@@ -1,5 +1,7 @@
 'use strict';
 
+var Legs = require('legs');
+
 var bind = function(obj, method) {
   return function() {
     method.apply(obj, arguments);
@@ -44,6 +46,7 @@ Demo.prototype.setUpScene = function(viewport) {
   this.scene.renderer.domElement.addEventListener("mousewheel", bind(this, this.onMouseWheel), false);
   this.scene.renderer.domElement.addEventListener("DOMMouseScroll", bind(this, this.onMouseWheel), false);
   this.scene.renderer.domElement.addEventListener('mousemove', bind(this, this.onMouseMove));
+  this.scene.renderer.domElement.addEventListener('mousedown', bind(this, this.onMouseDown));
 
   this.scene.camera = new THREE.PerspectiveCamera(
     35,
@@ -71,6 +74,8 @@ Demo.prototype.setUpScene = function(viewport) {
   light.shadowMapWidth = light.shadowMapHeight = 2048;
   light.shadowDarkness = .7;
   this.scene.add(light);
+
+  this.thrownBoxes = [];
 };
 
 Demo.prototype.setUpPhysics = function() {
@@ -153,6 +158,12 @@ Demo.prototype.onMouseWheel = function(event) {
   this.zoom = Math.max(0, Math.min(this.zoom, 80));
 };
 
+Demo.prototype.onMouseDown = function(event) {
+  /* TODO: take the mass, size and velocity from user input */
+  if(window.location.hash === '#throw')
+    this.throwBox(4, new THREE.Vector3(1, 1, 1), 60);
+};
+
 Demo.prototype.updateCamera = function()
 {
   /* start with the camera at the origin */
@@ -199,6 +210,38 @@ Demo.prototype.animate = function() {
   this.updatePhysics();
   this.scene.renderer.clear();
   this.scene.renderer.render(this.scene, this.scene.camera);
+};
+
+Demo.prototype.throwBox = function(mass, size, velocity) {
+  /* reuses the Bone model for the boxes */
+  var box = new Legs.Model.Bone(mass, size);
+
+  /* enables collisions between the boxes and the character */
+  /* FIXME: this values shouldn't be hardcoded like this */
+  box.collisionGroup = 2 /* GROUND */;
+  box.collidesWith = 3 /* GROUND | BONE */;
+
+  /* translates the box to the camera's position */
+  box.translate(this.scene.camera.position.x,
+                this.scene.camera.position.y,
+                this.scene.camera.position.z);
+
+  /* builds the box and inserts it into the scene */
+  box.buildAndInsert(this.scene);
+
+  var dir = new THREE.Vector3();
+  dir.subVectors(this.scene.camera.target.visual.position,
+                 this.scene.camera.position);
+  dir.normalize();
+  dir.multiplyScalar(velocity);
+  box.body.setLinearVelocity(new Ammo.btVector3(dir.x, dir.y, dir.z));
+
+  /* keeps track of the boxes so it can clean them up as they start to pile up */
+  this.thrownBoxes.push(box);
+
+  /* if it has too many boxes, it removes the oldest one */
+  if(this.thrownBoxes.length > 10)
+    this.scene.remove(this.thrownBoxes.shift().visual);
 };
 
 var Force = function() {

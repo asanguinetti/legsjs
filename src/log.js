@@ -1,5 +1,11 @@
 'use strict';
 
+var extend = function(extended, base) {
+  extended.prototype = Object.create(base.prototype);
+  extended.prototype.base = base;
+  extended.prototype.constructor = extended;
+};
+
 var Logger = function() {
   this.time = 0;
   this.info = {};

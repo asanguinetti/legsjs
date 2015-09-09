@@ -55,8 +55,7 @@ var extend = function(extended, base) {
 var CollisionGroup = {
   NONE: 0,
   BONE: 1,
-  GROUND: 2,
-  MUSCLE: 4
+  GROUND: 2
 };
 
 var RigidBody = function(mass, size) {
@@ -286,7 +285,7 @@ Bone.prototype.buildVisual = function() {
 var Ground = function(size) {
   this.base.call(this, 0, size);
   this.collisionGroup = CollisionGroup.GROUND;
-  this.collidesWith = CollisionGroup.BONE;
+  this.collidesWith = CollisionGroup.BONE | CollisionGroup.GROUND;
 };
 
 extend(Ground, RigidBody);
