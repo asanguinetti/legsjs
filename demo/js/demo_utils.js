@@ -265,9 +265,11 @@ Demo.prototype.throwBox = function(mass, size, velocity, direction) {
   this.thrownBoxes.push(box);
 
   /* if it has too many boxes, it removes the oldest one */
-  /* FIXME: the collision object should also be removed */
-  if(this.thrownBoxes.length > 10)
-    this.scene.remove(this.thrownBoxes.shift().visual);
+  if(this.thrownBoxes.length > 10) {
+    var box = this.thrownBoxes.shift();
+    box.detach(this.scene);
+    box.destroy();
+  }
 };
 
 var Force = function() {

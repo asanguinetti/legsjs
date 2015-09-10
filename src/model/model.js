@@ -74,6 +74,19 @@ var RigidBody = function(mass, size) {
   this.btVecAux2 = new Ammo.btVector3();
 };
 
+RigidBody.prototype.detach = function(scene) {
+  scene.remove(this.visual);
+  scene.world.bodies.splice(scene.world.bodies.indexOf(this), 1);
+  scene.world.removeRigidBody(this.body);
+};
+
+RigidBody.prototype.destroy = function() {
+  Ammo.destroy(this.btTransformAux);
+  Ammo.destroy(this.btVecAux);
+  Ammo.destroy(this.btVecAux2);
+  Ammo.destroy(this.body);
+};
+
 RigidBody.prototype.translate = function(x, y, z) {
   this.transformAux.makeTranslation(x, y, z);
   this.transform.multiplyMatrices(this.transformAux, this.transform);
@@ -270,6 +283,11 @@ Bone.prototype.buildRigidBody = function() {
   var rbInfo = new Ammo.btRigidBodyConstructionInfo(this.mass, motionState, 
                                                     shape, localInertia);
   this.body = new Ammo.btRigidBody(rbInfo);
+
+  Ammo.destroy(t);
+  Ammo.destroy(halfExtents);
+  Ammo.destroy(localInertia);
+  Ammo.destroy(rbInfo);
 };
 
 Bone.prototype.buildVisual = function() {
@@ -304,6 +322,11 @@ Ground.prototype.buildRigidBody = function() {
                                                     shape, localInertia);
   this.body = new Ammo.btRigidBody(rbInfo);
   this.body.setFriction(3);
+
+  Ammo.destroy(t);
+  Ammo.destroy(halfExtents);
+  Ammo.destroy(localInertia);
+  Ammo.destroy(rbInfo);
 };
 
 Ground.prototype.buildVisual = function() {
@@ -337,6 +360,14 @@ var Joint = function(bodyA, bodyB, pivotInA, pivotInB) {
 
   var zero = new THREE.Vector3(0, 0, 0);
   var unit = new THREE.Vector3(1, 0, 0);
+};
+
+Joint.prototype.detach = function(scene) {
+  scene.world.removeConstraint(this.c);
+};
+
+Joint.prototype.destroy = function() {
+  Ammo.destroy(this.c);
 };
 
 Joint.prototype.getPosition = function() {
@@ -382,19 +413,25 @@ extend(HingeJoint, Joint);
 
 HingeJoint.prototype.buildAndInsert = function(scene) {
   var xAxis = new Ammo.btVector3(1, 0, 0);
+  var btPivotInA = new Ammo.btVector3(this.pivotInA.x,
+                                      this.pivotInA.y,
+                                      this.pivotInA.z);
+  var btPivotInB = new Ammo.btVector3(this.pivotInB.x,
+                                      this.pivotInB.y,
+                                      this.pivotInB.z);
   this.c = new Ammo.btHingeConstraint(this.bodyA.body,
                                       this.bodyB.body,
-                                      new Ammo.btVector3(this.pivotInA.x,
-                                                         this.pivotInA.y,
-                                                         this.pivotInA.z),
-                                      new Ammo.btVector3(this.pivotInB.x,
-                                                         this.pivotInB.y,
-                                                         this.pivotInB.z),
+                                      btPivotInA,
+                                      btPivotInB,
                                       xAxis, xAxis, true);
 
   this.c.setLimit(this.lowerLimit, this.higherLimit);
 
   scene.world.addConstraint(this.c, true);
+
+  Ammo.destroy(xAxis);
+  Ammo.destroy(btPivotInA);
+  Ammo.destroy(btPivotInB);
 };
 
 var BallSocketJoint = function(bodyA, bodyB, pivotInA, pivotInB, angularLowerLimit, angularUpperLimit) {
@@ -408,14 +445,15 @@ extend(BallSocketJoint, Joint);
 BallSocketJoint.prototype.buildAndInsert = function(scene) {
   var frameInA = new Ammo.btTransform();
   var frameInB = new Ammo.btTransform();
+  var btVector3 = new Ammo.btVector3();
+
   frameInA.setIdentity();
-  frameInA.setOrigin(new Ammo.btVector3(this.pivotInA.x,
-                                        this.pivotInA.y,
-                                        this.pivotInA.z));
+  btVector3.setValue(this.pivotInA.x, this.pivotInA.y, this.pivotInA.z);
+  frameInA.setOrigin(btVector3);
+
   frameInB.setIdentity();
-  frameInB.setOrigin(new Ammo.btVector3(this.pivotInB.x,
-                                        this.pivotInB.y,
-                                        this.pivotInB.z));
+  btVector3.setValue(this.pivotInB.x, this.pivotInB.y, this.pivotInB.z);
+  frameInB.setOrigin(btVector3);
 
   this.c = new Ammo.btGeneric6DofConstraint(this.bodyA.body, 
                                             this.bodyB.body, 
@@ -423,14 +461,21 @@ BallSocketJoint.prototype.buildAndInsert = function(scene) {
                                             frameInB, 
                                             true);
 
-  this.c.setAngularLowerLimit(new Ammo.btVector3(this.angularLowerLimit[0],
-                                                 this.angularLowerLimit[1],
-                                                 this.angularLowerLimit[2]));
-  this.c.setAngularUpperLimit(new Ammo.btVector3(this.angularUpperLimit[0],
-                                                 this.angularUpperLimit[1],
-                                                 this.angularUpperLimit[2]));
+  btVector3.setValue(this.angularLowerLimit[0],
+                     this.angularLowerLimit[1],
+                     this.angularLowerLimit[2]);
+  this.c.setAngularLowerLimit(btVector3);
+
+  btVector3.setValue(this.angularUpperLimit[0],
+                     this.angularUpperLimit[1],
+                     this.angularUpperLimit[2]);
+  this.c.setAngularUpperLimit(btVector3);
 
   scene.world.addConstraint(this.c, true);
+
+  Ammo.destroy(btVector3);
+  Ammo.destroy(frameInB);
+  Ammo.destroy(frameInA);
 };
 
 module.exports.Joint = Joint;
