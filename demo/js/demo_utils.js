@@ -18,8 +18,6 @@ var Demo = function(viewport) {
   this.pinchDist = 0;
   this.inclination = Math.PI/4;
   this.azimuth = 0;
-  this.yaw = 0;
-  this.pitch = 0;
   this.zoom = 50;
   this.cameraPosMat = new THREE.Matrix4();
   this.m1 = new THREE.Matrix4();
@@ -47,6 +45,7 @@ Demo.prototype.setUpScene = function(viewport) {
   this.scene.renderer.domElement.addEventListener("DOMMouseScroll", bind(this, this.onMouseWheel), false);
   this.scene.renderer.domElement.addEventListener('mousemove', bind(this, this.onMouseMove));
   this.scene.renderer.domElement.addEventListener('mousedown', bind(this, this.onMouseDown));
+  this.scene.renderer.domElement.addEventListener('mouseup', bind(this, this.onMouseUp));
 
   this.scene.camera = new THREE.PerspectiveCamera(
     35,
@@ -76,8 +75,10 @@ Demo.prototype.setUpScene = function(viewport) {
   this.scene.add(light);
 
   this.raycaster = new THREE.Raycaster();
-
   this.thrownBoxes = [];
+
+  this.mouseDownPos = new THREE.Vector2();
+  this.mouseDragging = false;
 };
 
 Demo.prototype.setUpPhysics = function() {
@@ -130,6 +131,10 @@ Demo.prototype.onMouseMove = function(event) {
     }
     event = event.changedTouches[0];
   }
+
+  /* only proceed if this is a drag gesture */
+  if(!this.mouseDragging)
+    return;
     
   if(event.clientX) {
       x = event.clientX+document.body.scrollLeft;
@@ -139,17 +144,22 @@ Demo.prototype.onMouseMove = function(event) {
       y = event.pageY+window.pageYOffset;
   }
 
-  /* azimuth goes from -PI to PI as the cursor's X goes from left to right */
-  this.azimuth = x * 2 * Math.PI / window.innerWidth - Math.PI;
+  /* gets the position relative to the position where the drag started */
+  x -= this.mouseDownPos.x;
+  y -= this.mouseDownPos.y;
 
-  /* inclination goes from PI/2 to 0 as the cursor's Y goes from top to bottom"*/
-  this.inclination = (window.innerHeight - y) * Math.PI / (2*window.innerHeight);
+  /* updates the mouse down position */
+  this.mouseDownPos.x += x;
+  this.mouseDownPos.y += y;  
 
-  /* azimuth will work for yaw since it goes from -PI to PI */
-  this.yaw = this.azimuth;
+  /* dragging across the whole screen from left to right should add 2PI to the azimuth */
+  this.azimuth += x * 2 * Math.PI / window.innerWidth;
 
-  /* we need pitch to go from PI/2 to -PI/2 as Y goes from top to bottom */
-  this.pitch = (window.innerHeight - y) * Math.PI / (window.innerHeight) - Math.PI/2;
+  /* dragging across the whole screen from top to bottom should subtract PI/2 to the inclination */
+  this.inclination -= y * Math.PI / (2*window.innerHeight);
+
+  /* clamps the inclination to avoid gimbal lock problems */
+  this.inclination = Math.min(Math.max(this.inclination, -Math.PI/2), Math.PI/2);
 };
 
 Demo.prototype.onMouseWheel = function(event) {
@@ -161,26 +171,60 @@ Demo.prototype.onMouseWheel = function(event) {
 };
 
 Demo.prototype.onMouseDown = function(event) {
-  if(window.location.hash === '#throw') {
-    event.preventDefault();
-    var x;
-    var y;
+  if(typeof event == 'undefined')
+    event = window.event;
+  
+  event.preventDefault();
 
-    /* gets the mouse click coordinates */
-    if(event.clientX) {
-      x = event.clientX+document.body.scrollLeft;
-      y = event.clientY+document.body.scrollTop;
-    } else if(event.pageX) {
-      x = event.pageX+window.pageXOffset;
-      y = event.pageY+window.pageYOffset;
+  if(event.changedTouches) {
+    if(event.touches.length != 1)
+      return;
+    event = event.changedTouches[0];
+  }
+    
+  if(event.clientX) {
+    this.mouseDownPos.x = event.clientX+document.body.scrollLeft;
+    this.mouseDownPos.y = event.clientY+document.body.scrollTop;
+  } else if(event.pageX) {
+    this.mouseDownPos.x = event.pageX+window.pageXOffset;
+    this.mouseDownPos.y = event.pageY+window.pageYOffset;
+  }
+
+  this.mouseDragging = true;
+  
+  var self = this;
+  var x = this.mouseDownPos.x;
+  var y = this.mouseDownPos.y;
+  setTimeout(function() {
+    if(!self.mouseDragging &&
+       x == self.mouseDownPos.x &&
+       y == self.mouseDownPos.y) {
+      self.onMouseTap(event);
     }
+  },200);
+};
 
+Demo.prototype.onMouseUp = function(event) {
+  if(typeof event == 'undefined')
+    event = window.event;
+
+  event.preventDefault();
+
+  /* consider only single finger releases */
+  if(event.changedTouches && event.touches.length != 0)
+    return;
+
+  this.mouseDragging = false;
+};
+
+Demo.prototype.onMouseTap = function(event) {
+  if(window.location.hash === '#throw') {
     /* normalizes the coordinates between -1 and 1 */
-    x = (x / window.innerWidth) * 2 - 1;
-    y = -(y / window.innerHeight) * 2 + 1;
+    this.mouseDownPos.x = (this.mouseDownPos.x / window.innerWidth) * 2 - 1;
+    this.mouseDownPos.y = -(this.mouseDownPos.y / window.innerHeight) * 2 + 1;
 
     /* builds a ray from the camera to a point in infinity */
-    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.scene.camera);
+    this.raycaster.setFromCamera(this.mouseDownPos, this.scene.camera);
 
     var throwParams = document.getElementById("throw");
     var mass = parseFloat(throwParams.querySelector("input[name=mass]").value);
@@ -211,6 +255,7 @@ Demo.prototype.updateCamera = function()
   /* applies the transformation to the camera position */
   this.scene.camera.position.applyMatrix4(this.cameraPosMat);
   this.scene.camera.position.add(this.scene.camera.target.visual.position);
+  this.scene.camera.position.z = Math.max(this.scene.camera.position.z, 1);
   this.scene.camera.lookAt(this.scene.camera.target.visual.position);
 };
 
