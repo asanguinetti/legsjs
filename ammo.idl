@@ -127,7 +127,7 @@ ClosestRayResultCallback implements RayResultCallback;
 interface btManifoldPoint {
   [Const, Ref] btVector3 getPositionWorldOnA();
   [Const, Ref] btVector3 getPositionWorldOnB();
-
+  [Const] double getDistance();
   [Value] attribute btVector3 m_localPointA;
   [Value] attribute btVector3 m_localPointB;
   [Value] attribute btVector3 m_positionWorldOnB;
@@ -198,41 +198,57 @@ btConvexTriangleMeshShape implements btConvexShape;
 
 interface btBoxShape {
   void btBoxShape([Ref] btVector3 boxHalfExtents);
+  void setMargin(float margin);
+  float getMargin();
 };
 btBoxShape implements btCollisionShape;
 
 interface btCapsuleShape {
   void btCapsuleShape(float radius, float height);
+  void setMargin(float margin);
+  float getMargin();
 };
 btCapsuleShape implements btCollisionShape;
 
 interface btCapsuleShapeX {
   void btCapsuleShapeX(float radius, float height);
+  void setMargin(float margin);
+  float getMargin();
 };
 btCapsuleShapeX implements btCapsuleShape;
 
 interface btCapsuleShapeZ {
   void btCapsuleShapeZ(float radius, float height);
+  void setMargin(float margin);
+  float getMargin();
 };
 btCapsuleShapeZ implements btCapsuleShape;
 
 interface btCylinderShape {
   void btCylinderShape([Ref] btVector3 halfExtents);
+  void setMargin(float margin);
+  float getMargin();
 };
 btCylinderShape implements btCollisionShape;
 
 interface btCylinderShapeX {
   void btCylinderShapeX([Ref] btVector3 halfExtents);
+  void setMargin(float margin);
+  float getMargin();
 };
 btCylinderShapeX implements btCylinderShape;
 
 interface btCylinderShapeZ {
   void btCylinderShapeZ([Ref] btVector3 halfExtents);
+  void setMargin(float margin);
+  float getMargin();
 };
 btCylinderShapeZ implements btCylinderShape;
 
 interface btSphereShape {
   void btSphereShape(float radius);
+  void setMargin(float margin);
+  float getMargin();
 };
 btSphereShape implements btCollisionShape;
 
@@ -244,6 +260,8 @@ btConeShape implements btCollisionShape;
 interface btConvexHullShape {
   void btConvexHullShape();
   void addPoint([Const, Ref] btVector3 point, optional boolean recalculateLocalAABB);
+  void setMargin(float margin);
+  float getMargin();
 };
 btConvexHullShape implements btCollisionShape;
 
@@ -260,6 +278,11 @@ btConeShapeZ implements btConeShape;
 interface btCompoundShape {
   void btCompoundShape(optional boolean enableDynamicAabbTree);
   void addChildShape([Const, Ref] btTransform localTransform, btCollisionShape shape);
+  void removeChildShapeByIndex(long childShapeindex);
+  [Const] long getNumChildShapes();
+  btCollisionShape getChildShape(long index);
+  void setMargin(float margin);
+  float getMargin();
 };
 btCompoundShape implements btCollisionShape;
 
@@ -289,6 +312,22 @@ interface btBvhTriangleMeshShape {
   void btBvhTriangleMeshShape(btStridingMeshInterface meshInterface, boolean useQuantizedAabbCompression, optional boolean buildBvh);
 };
 btBvhTriangleMeshShape implements btTriangleMeshShape;
+
+enum PHY_ScalarType {
+  "PHY_FLOAT",
+  "PHY_DOUBLE",
+  "PHY_INTEGER",
+  "PHY_SHORT",
+  "PHY_FIXEDPOINT88",
+  "PHY_UCHAR"
+};
+interface btHeightfieldTerrainShape {
+  void btHeightfieldTerrainShape(long heightStickWidth, long heightStickLength, any heightfieldData, float heightScale, float minHeight, float maxHeight, long upAxis, PHY_ScalarType heightDataType, boolean flipQuadEdges);
+
+  void setUseDiamondSubdivision(boolean useDiamondSubdivision);
+  void setUseZigzagSubdivision(boolean useZigzagSubdivision);
+};
+btHeightfieldTerrainShape implements btConcaveShape;
 
 interface btDefaultCollisionConstructionInfo {
   void btDefaultCollisionConstructionInfo();
@@ -379,6 +418,7 @@ interface btRigidBody {
   void setLinearVelocity([Const, Ref] btVector3 lin_vel);
   void setAngularVelocity([Const, Ref] btVector3 ang_vel);
   btMotionState getMotionState();
+  void setMotionState(btMotionState motionState);
   void setAngularFactor([Const, Ref] btVector3 angularFactor);
   btRigidBody upcast([Const] btCollisionObject colObj);
 };
@@ -461,7 +501,8 @@ interface btHingeConstraint {
   void btHingeConstraint ([Ref] btRigidBody rbA, [Ref] btRigidBody rbB, [Ref] btTransform rbAFrame, [Ref] btTransform rbBFrame, optional boolean useReferenceFrameA);
   void btHingeConstraint ([Ref] btRigidBody rbA, [Ref] btTransform rbAFrame, optional boolean useReferenceFrameA);
 
-  void setLimit(float low, float hight, float softness, float biasFactor, optional float relaxationFactor);
+  void setLimit(float low, float high, float softness, float biasFactor, optional float relaxationFactor);
+  void enableAngularMotor(boolean enableMotor, float targetVelocity, float maxMotorImpulse);
 };
 btHingeConstraint implements btTypedConstraint;
 

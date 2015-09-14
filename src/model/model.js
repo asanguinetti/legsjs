@@ -348,6 +348,102 @@ Ground.prototype.buildVisual = function() {
   this.visual.add(mesh);
 };
 
+var UnevenGround = function(size) {
+  this.base.call(this, 0, size);
+  this.collisionGroup = CollisionGroup.GROUND;
+  this.collidesWith = CollisionGroup.BONE | CollisionGroup.GROUND;
+
+  this.numVertices = 129;
+  this.heightScale = 20 / 256;
+  this.heights = new Float32Array(this.numVertices * this.numVertices);
+  var nBytes = this.heights.length * this.heights.BYTES_PER_ELEMENT;
+  var buf = Ammo._malloc(nBytes);
+  this.dataHeap = new Uint8Array(Ammo.HEAPU8.buffer, buf, nBytes);
+  /* FIXME: this.dataHeap is never freed */
+
+  this.generateHeigths(size.x, size.y);
+  this.dataHeap.set(new Uint8Array(this.heights.buffer));
+};
+
+extend(UnevenGround, RigidBody);
+
+UnevenGround.prototype.getHeight = function(x, y) {
+  var i = Math.floor((x + this.size.x) * (this.numVertices-1) / (2*this.size.x));
+  var j = Math.floor((y + this.size.y) * (this.numVertices-1) / (2*this.size.y));
+  return this.heights[i + j * this.numVertices];
+};
+
+UnevenGround.prototype.generateHeigths = function(w, h) {
+  var maxRadius = Math.sqrt(w*w + h*h);
+  for(var j = 0; j < this.numVertices; j++) {
+    for(var i = 0; i < this.numVertices; i++) {
+      var x = (i * 2*w / this.numVertices) - w;
+      var y = (j * 2*h / this.numVertices) - h;
+      var range = 256 * 2.5 * Math.sqrt(x*x + y*y)/maxRadius;
+      this.heights[i + j * this.numVertices] = (Math.random() * range - range/2) * this.heightScale;
+    }
+  }
+};
+
+UnevenGround.prototype.buildRigidBody = function() {
+  /* sets up the motion state from the current transform */
+  var t = new Ammo.btTransform();
+  three2BulletTransform(this.transform, t);
+  var motionState = new Ammo.btDefaultMotionState(t);
+  
+  var localInertia = new Ammo.btVector3(0, 0, 0);
+  
+  var shape = new Ammo.btHeightfieldTerrainShape(this.numVertices, this.numVertices,
+                                                 this.dataHeap.byteOffset,
+                                                 1,
+                                                 -20, 20, 2,
+                                                 Ammo.PHY_FLOAT,
+                                                 false);
+  shape.setUseDiamondSubdivision(true);
+  shape.setLocalScaling(new Ammo.btVector3(2*this.size.x/(this.numVertices - 1),
+                                           2*this.size.y/(this.numVertices - 1),
+                                           1));
+  shape.calculateLocalInertia(this.mass,localInertia);
+  var rbInfo = new Ammo.btRigidBodyConstructionInfo(this.mass, motionState, 
+                                                    shape, localInertia);
+  this.body = new Ammo.btRigidBody(rbInfo);
+  this.body.setFriction(3);
+
+  Ammo.destroy(t);
+  Ammo.destroy(localInertia);
+  Ammo.destroy(rbInfo);
+};
+
+UnevenGround.prototype.buildVisual = function() {
+  var mesh = new THREE.Mesh(new THREE.PlaneGeometry(2*this.size.x,
+                                                    2*this.size.y,
+                                                    this.numVertices - 1,
+                                                    this.numVertices - 1), 
+                            new THREE.MeshLambertMaterial({color: 0xeeeeee}));
+  mesh.receiveShadow = true;
+  mesh.castShadow = false;
+
+  var lightColor = new THREE.Color(0xcccccc);
+  var darkColor = new THREE.Color(0xaaaaaa);
+  for(var i = 0; i < mesh.geometry.faces.length; i++) {
+    var colEven = Math.floor(i / 2) % 2;
+    var rowEven = Math.floor(i / (2*(this.numVertices - 1))) % 2;
+    var color = colEven == rowEven ? lightColor : darkColor;
+    mesh.geometry.faces[i].vertexColors[0] = color;
+    mesh.geometry.faces[i].vertexColors[1] = color;
+    mesh.geometry.faces[i].vertexColors[2] = color;
+  }
+  mesh.material.vertexColors = THREE.VertexColors;
+
+  for(var i = 0; i < mesh.geometry.vertices.length; i++) {
+    var vertex = mesh.geometry.vertices[i];
+    vertex.z = this.getHeight(vertex.x, vertex.y);
+  }
+
+  this.visual = new THREE.Object3D();
+  this.visual.add(mesh);
+};
+
 var Joint = function(bodyA, bodyB, pivotInA, pivotInB) {
   this.bodyA = bodyA;
   this.bodyB = bodyB;
@@ -483,3 +579,4 @@ module.exports.HingeJoint = HingeJoint;
 module.exports.BallSocketJoint = BallSocketJoint;
 module.exports.Bone = Bone;
 module.exports.Ground = Ground;
+module.exports.UnevenGround = UnevenGround;

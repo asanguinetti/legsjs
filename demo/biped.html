@@ -28,7 +28,11 @@
     demo.scene.world.setGravity(new Ammo.btVector3(0, 0, -gravity));
 
     /* ground */
-    var ground = new Legs.Model.Ground(new THREE.Vector3(500, 500, 0.5));
+    var ground;
+    if(window.location.hash === '#terrain')
+      ground = new Legs.Model.UnevenGround(new THREE.Vector3(500, 500, 0.5));
+    else
+      ground = new Legs.Model.Ground(new THREE.Vector3(500, 500, 0.5));
     ground.buildAndInsert(demo.scene);
 
     var skeletalFigure = Legs.SkeletalFigure.SkeletalSegment.fromJSON(SkeletalBiped);
