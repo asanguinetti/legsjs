@@ -39,9 +39,9 @@
     demo.scene.camera.target = trunk;
 
     var controlParams = {
-      legFrame: {
+      orientationVT: {
         torqueLimit: 1000,
-        pdGains: [6000, 1200],
+        pdGains: [2000, -200],
         fbGains: [0, 0]
       },
       joints: [
@@ -89,6 +89,12 @@
                                                eval(inputs[1].value),
                                                eval(inputs[2].value)));
         force.show();
+      }
+
+      if(window.location.hash === '#heading')
+      {
+        var input = document.querySelector("#heading input");
+        legFrame.heading = input.value;
       }
 
       /* iterates over the contact manifolds to check if any leg is touching the ground */
@@ -158,6 +164,11 @@
       </p>
       <p>
         <label>velocity </label><input name="velocity" value="60" />
+      </p>
+    </div>
+    <div id="heading">
+      <p>
+        <label>heading </label><input type="number" step="0.1" name="heading" value="0" />
       </p>
     </div>
   </div>

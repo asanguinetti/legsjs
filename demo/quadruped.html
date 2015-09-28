@@ -36,9 +36,9 @@
     demo.scene.camera.target = trunk;
 
     var controlParams = {
-      legFrame: {
+      orientationVT: {
         torqueLimit: 1000,
-        pdGains: [3000, 500],
+        pdGains: [3000, -500],
         fbGains: [0, 0]
       },
       joints: [

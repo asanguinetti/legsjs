@@ -42,11 +42,6 @@ exports.setUp = function(callback)
   trunk.translate(0, 0, 6.4 + trunk.size.z + 0.5);
 
   var controlParams = {
-    legFrame: {
-      torqueLimit: 1000,
-      pdGains: [6000, 1200],
-      fbGains: [0, 0]
-    },
     joints: [
       {
         torqueLimit: 1000,

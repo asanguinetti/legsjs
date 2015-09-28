@@ -12,8 +12,8 @@ var SkeletalBipedLeg = {
         model: Legs.Model.Bone, mass: 4, size: [0.2, 0.2, 1.3],
         children: [
           {
-            model: Legs.Model.HingeJoint,
-            modelParams: [1, 0],
+            model: Legs.Model.BallSocketJoint,
+            modelParams: [[-Math.PI, -0.1, -Math.PI/4], [0, 0.1, Math.PI/4]],
             snapPointParent: [0, 0, -1],
             snapPointChild: [0, 0, 1],
             child: {
@@ -31,14 +31,14 @@ var SkeletalBiped = {
   children: [
     {
       model: Legs.Model.BallSocketJoint,
-      modelParams: [[1, -Math.PI/4, 0], [0, Math.PI/4, 0]],
+      modelParams: [[-Math.PI/2, -Math.PI/4, -Math.PI/4], [Math.PI/2, Math.PI/4, Math.PI/4]],
       snapPointParent: [1, 0, -1],
       snapPointChild: [0, 0, 1],
       child: SkeletalBipedLeg
     },
     {
       model: Legs.Model.BallSocketJoint,
-      modelParams: [[1, -Math.PI/4, 0], [0, Math.PI/4, 0]],
+      modelParams: [[-Math.PI/2, -Math.PI/4, -Math.PI/4], [Math.PI/2, Math.PI/4, Math.PI/4]],
       snapPointParent: [-1, 0, -1],
       snapPointChild: [0, 0, 1],
       child: SkeletalBipedLeg

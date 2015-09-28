@@ -15,6 +15,57 @@ var clamp = function(x, min, max) {
   return Math.min(Math.max(x, min), max);
 };
 
+/** Computes the torque to bring the current orientation to the target 
+ *  orientation. Target angular velocity is always zero.
+ *
+ * \param  Object cParams Control parameters.
+ * \param  Quaternion curQ Current orientation.
+ * \param  Quaternion targetQ Target orientation.
+ * \param  Vector curOmega Current angular velocity.
+ * \param  Vector torque Vector to update with the resulting torque (optional).
+ * \return Vector Torque.
+ *
+ * \note the resulting reference frame is the same as that of the parameters.
+ *       Also make sure that the parameters are in the same reference frame.
+ */
+var computeRelTorque = function(cParams, curQ, targetQ, curOmega, torque) {
+  var tq = torque;
+  if(tq === undefined)
+    tq = new THREE.Vector3();
+
+  /* starts by computing the proportional part */
+  /* qDelta = curQ^-1 * targetQ */
+  var qDelta = targetQ;
+  qDelta.multiplyQuaternions(curQ.conjugate(), targetQ);
+  tq.set(qDelta.x, qDelta.y, qDelta.z);
+
+  var sinHalfAngle = tq.length();
+
+  /* this could potentially be slightly greater than 1 due to numerical
+   * errors, which is bad for computing the asin later */
+  sinHalfAngle = clamp(sinHalfAngle, -1, 1);
+
+  /* avoids division by zero if the orientations match too closely */
+  if(!isZero(sinHalfAngle))
+  {
+    var angle = 2*Math.asin(sinHalfAngle);
+    var sign = (qDelta.w < 0) ? -1 : 1;
+    tq.multiplyScalar(1/sinHalfAngle * angle * cParams.pdGains[0] * sign);
+  }
+  else
+  {
+    tq.set(0, 0, 0);
+  }
+
+  /* adds the derivative part */
+  tq.add(curOmega.multiplyScalar(cParams.pdGains[1]));
+
+  if(tq.length() > cParams.torqueLimit)
+    tq.multiplyScalar(cParams.torqueLimit/tq.length());
+
+  return tq;
+};
+
 var Gait = function() {
 };
 
@@ -55,47 +106,8 @@ Joint.prototype.computeTargetQFromRelAngles = function(pitch, roll) {
   this.targetQ.setFromEuler(this.auxEuler).conjugate();
 };
 
-/** Computes the torque to bring the current orientation to the target 
- *  orientation. Target angular velocity is always zero.
- *
- * \param  Quaternion curQ Current orientation.
- * \param  Quaternion targetQ Target orientation.
- * \param  Vector curOmega Current angular velocity.
- * \return Vector Torque.
- *
- * \note the resulting reference frame is the same as that of the parameters.
- *       Also make sure that the parameters are in the same reference frame.
- */
 Joint.prototype.computeRelTorque = function(curQ, targetQ, curOmega) {
-  /* starts by computing the proportional part */
-  /* qDelta = curQ^-1 * targetQ */
-  var qDelta = targetQ;
-  qDelta.multiplyQuaternions(curQ.conjugate(), targetQ);
-  this.torque.set(qDelta.x, qDelta.y, qDelta.z);
-
-  var sinHalfAngle = this.torque.length();
-
-  /* this could potentially be slightly greater than 1 due to numerical
-   * errors, which is bad for computing the asin later */
-  sinHalfAngle = clamp(sinHalfAngle, -1, 1);
-
-  /* avoids division by zero if the orientations match too closely */
-  if(!isZero(sinHalfAngle))
-  {
-    var angle = 2*Math.asin(sinHalfAngle);
-    var sign = (qDelta.w < 0) ? -1 : 1;
-    this.torque.multiplyScalar(1/sinHalfAngle * angle * this.controlParams.pdGains[0] * sign);
-  }
-  else
-  {
-    this.torque.set(0, 0, 0);
-  }
-
-  /* adds the derivative part */
-  this.torque.add(curOmega.multiplyScalar(this.controlParams.pdGains[1]));
-
-  if(this.torque.length() > this.controlParams.torqueLimit)
-    this.torque.multiplyScalar(this.controlParams.torqueLimit/this.torque.length());
+  return computeRelTorque(this.controlParams, curQ, targetQ, curOmega, this.torque);
 };
 
 Joint.prototype.computeTorque = function(charFrame) {
@@ -193,10 +205,7 @@ Leg.prototype.getFootPos = function() {
 };
 
 var LegFrame = function(gait, rootSkSgmt, controlParams) {
-  this.LFTransform = new THREE.Matrix4();
-  this.LFEuler = new THREE.Euler();
-  this.torqueLF = new THREE.Vector3();
-  this.torqueSwing = new THREE.Vector3();
+  this.heading = 0;
   
   this.fbP = new THREE.Vector3();
   this.fbD = new THREE.Vector3();
@@ -212,15 +221,22 @@ var LegFrame = function(gait, rootSkSgmt, controlParams) {
     this.legs.push(new Leg(this.gait.getAnglesForLeg(i),
                            rootSkSgmt.childrenJoints[i],
                            controlParams));
+
+  this.vts = [
+    this.orientationVT = new THREE.Vector3()
+  ]
+
+  this.auxVect3 = new THREE.Vector3();
 };
 
 LegFrame.prototype.update = function(timeStep) {
   /* advances the gait */
   this.gait.update(timeStep);
 
+  /* computes the feedback angles */
   this.computeFeedbackAngles();
 
-  var zero = new THREE.Vector3();
+  var zero = this.auxVect3.set(0, 0, 0);
   for(var i = 0; i < this.legs.length; i++)
   {
     if(this.gait.isStanceLeg(i))
@@ -231,11 +247,62 @@ LegFrame.prototype.update = function(timeStep) {
                                   this.fbP, this.fbD);
   }
 
-  this.applyNetTorque();
+  /* resets the tracking torque for the stance hips */
+  for(var i = 0; i < this.legs.length; i++)
+    if(this.gait.isStanceLeg(i))
+      this.legs[i].joints[0].torque.set(0, 0, 0);
+
+  /* computes the trunk's orientation virtual torque */
+  this.computeOrientationVT();
+
+  /* adds all the virtual torques to the tracking torques */
+  this.addVTs();
+
+  /* applies the torques */
+  for(var i = 0; i < this.legs.length; i++)
+    this.legs[i].applyTorques();
+};
+
+LegFrame.prototype.addVTs = function() {
+  var addVT = function(vt, joints) {
+    for(var i = 0; i < joints.length; i++)
+      joints[i].torque.add(vt);
+  };
+
+  /* counts the stance legs */
+  var numStanceLegs = 0;
+  for(var i = 0; i < this.legs.length; i++)
+    if(this.gait.isStanceLeg(i))
+      numStanceLegs++;
+
+  /* if there are no stance legs, no virtual torques are added */
+  if(numStanceLegs == 0)
+    return;
+
+  /* splits the virtual torques equally among the stance legs */
+  for(var i = 0; i < this.vts.length; i++)
+    this.vts[i].multiplyScalar(1/numStanceLegs);
+
+  /* adds each virtual torque to each stance leg */
+  for(var i = 0; i < this.legs.length; i++)
+    if(this.gait.isStanceLeg(i))
+      for(var j = 0; j < this.vts.length; j++)
+        addVT(this.vts[j], this.legs[i].joints);
+};
+
+LegFrame.prototype.computeOrientationVT = function() {
+  var targetQ = new THREE.Quaternion();
+  targetQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.heading);
+
+  computeRelTorque(this.controlParams.orientationVT,
+                   this.trunk.getOrientation(),
+                   targetQ,
+                   this.trunk.getAngularVelocity(),
+                   this.orientationVT);
 };
 
 LegFrame.prototype.computeCOMPosNVel = function() {
-  var aux = new THREE.Vector3();
+  var aux = this.auxVect3.set(0, 0, 0);
   var totalMass = 0;
 
   this.trunk.toWorldFrame(aux, aux);
@@ -298,75 +365,6 @@ LegFrame.prototype.computeFeedbackAngles = function() {
     this.fbP.set(0, 0, 0);
     this.fbD.set(0, 0, 0);
   }
-};
-
-LegFrame.prototype.applyNetTorque = function() {
-  var numberStanceLegs = 0;
-  this.computeTorqueLF();
-  var dir = new THREE.Vector3();
-  dir.copy(this.torqueLF);
-  dir.normalize();
-  this.torqueSwing.set(0, 0, 0);
-  for(var i = 0; i < this.legs.length; i++) {
-    if(this.gait.isStanceLeg(i))
-      numberStanceLegs++;
-    else
-      this.torqueSwing.add(this.legs[i].joints[0].torque);
-  }
-
-  for(var i = 0; i < this.legs.length; i++)
-  {
-    if(this.gait.isStanceLeg(i))
-    {
-      this.legs[i].joints[0].torque.subVectors(this.torqueLF, this.torqueSwing);
-      this.legs[i].joints[0].torque.divideScalar(numberStanceLegs);
-    }
-    this.legs[i].applyTorques();
-  }
-};
-
-LegFrame.prototype.computeTorqueLF = function() {
-  var charFrame = new THREE.Quaternion();
-
-  /* gets the heading as a twist/swing decomposition of the orientation of the
-   * trunk, where orientation = heading * swing */
-  charFrame.copy(this.trunk.getHeading());
-  var omega = this.trunk.getAngularVelocity();
-
-  /* we want the swing to be the identity without affecting the heading
-   * so in the trunk's local frame, we need to induce a rotation of -swing
-   * so qDelta = -swing = -orientation * heading */
-  var qDelta = this.trunk.getOrientation();
-  qDelta.conjugate();
-  qDelta.multiply(charFrame);
-  this.torqueLF.set(qDelta.x, qDelta.y, qDelta.z);
-
-  var sinHalfAngle = this.torqueLF.length();
-
-  /* this could potentially be slightly greater than 1 due to numerical
-   * errors, which is bad for computing the asin later */
-  sinHalfAngle = clamp(sinHalfAngle, -1, 1);
-
-  /* avoids division by zero if the orientations match too closely */
-  if(!isZero(sinHalfAngle))
-  {
-    var angle = 2*Math.asin(sinHalfAngle);
-    var sign = (qDelta.w < 0) ? -1 : 1;
-    this.torqueLF.multiplyScalar(1/sinHalfAngle * angle * this.controlParams.legFrame.pdGains[0] * sign);
-  }
-  else
-  {
-    this.torqueLF.set(0, 0, 0);
-  }
-
-  this.torqueLF.applyQuaternion(this.trunk.getOrientation());
-
-  /* adds the derivative part */
-  this.torqueLF.add(omega.multiplyScalar(-this.controlParams.legFrame.pdGains[1]));
-
-  if(this.torqueLF.length() > this.controlParams.legFrame.torqueLimit)
-    this.torqueLF.multiplyScalar(this.controlParams.legFrame.torqueLimit/this.torqueLF.length());
-  return this.torqueLF;
 };
 
 module.exports.Gait = Gait;
