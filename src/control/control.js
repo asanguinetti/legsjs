@@ -295,10 +295,12 @@ LegFrame.prototype.computeOrientationVT = function() {
   targetQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.heading);
 
   computeRelTorque(this.controlParams.orientationVT,
-                   this.trunk.getOrientation(),
+                   this.trunk.getOrientation().clone(),
                    targetQ,
-                   this.trunk.getAngularVelocity(),
+                   this.trunk.getAngularVelocity().applyQuaternion(this.trunk.getOrientation().conjugate()),
                    this.orientationVT);
+  this.orientationVT.applyQuaternion(this.trunk.getOrientation());
+  return this.orientationVT;
 };
 
 LegFrame.prototype.computeCOMPosNVel = function() {
