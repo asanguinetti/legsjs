@@ -139,6 +139,12 @@ exports.inclinedXTest = function(test)
     test.ok(testUtils.isNearZero(refTq.length() - this.legFrame.orientationVT.length()),
             'The orientational virtual torque is expected to be the same, regardless of the heading as long as the target heading matches the current');
 
+    /* the orientationVT is in world coordinates
+     * the trunk is rotated on the X axis on the trunk's reference frame 
+     * as the trunk is rotated along the Z axis, the direction of orientationVT 
+     * also rotates, that is why we need to convert it to local coordinates 
+     * before comparing it with the reference torque */
+    this.legFrame.orientationVT.applyQuaternion(this.legFrame.trunk.getOrientation().conjugate())
     test.ok(testUtils.dirNearEqual(refTq, this.legFrame.orientationVT),
             'The orientational virtual torque is expected to be the same, regardless of the heading as long as the target heading matches the current');
   }
@@ -174,6 +180,12 @@ exports.inclinedYTest = function(test)
     test.ok(testUtils.isNearZero(refTq.length() - this.legFrame.orientationVT.length()),
             'The orientational virtual torque is expected to be the same, regardless of the heading as long as the target heading matches the current');
 
+    /* the orientationVT is in world coordinates
+     * the trunk is rotated on the Y axis on the trunk's reference frame 
+     * as the trunk is rotated along the Z axis, the direction of orientationVT 
+     * also rotates, that is why we need to convert it to local coordinates 
+     * before comparing it with the reference torque */
+    this.legFrame.orientationVT.applyQuaternion(this.legFrame.trunk.getOrientation().conjugate())
     test.ok(testUtils.dirNearEqual(refTq, this.legFrame.orientationVT),
             'The orientational virtual torque is expected to be the same, regardless of the heading as long as the target heading matches the current');
   }
