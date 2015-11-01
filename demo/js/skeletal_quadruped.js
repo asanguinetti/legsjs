@@ -23,9 +23,9 @@ var SkeletalQuadrupedRearLeg = {
                   model: Legs.Model.BallSocketJoint,
                   modelParams: [[-Math.PI, -0.1, -Math.PI/4], [0, 0.1, Math.PI/4]],
                   snapPointParent: [0, 0, -1],
-                  snapPointChild: [0, 0, 1],
+                  snapPointChild: [0, 0, 0.5],
                   child: {
-                    model: Legs.Model.Bone, mass: 1, size: [0.3, 0.1, 0.3]
+                    model: Legs.Model.Foot, mass: 1, size: [0.3, 0.1, 0.4]
                   }
                 }
               ]
@@ -60,9 +60,9 @@ var SkeletalQuadrupedFrontLeg = {
                   model: Legs.Model.BallSocketJoint,
                   modelParams: [[-Math.PI, -0.1, -Math.PI/4], [0, 0.1, Math.PI/4]],
                   snapPointParent: [0, 0, -1],
-                  snapPointChild: [0, 0, 1],
+                  snapPointChild: [0, 0, 0.5],
                   child: {
-                    model: Legs.Model.Bone, mass: 1, size: [0.3, 0.1, 0.3]
+                    model: Legs.Model.Foot, mass: 1, size: [0.3, 0.1, 0.4]
                   }
                 }
               ]
@@ -79,14 +79,14 @@ var SkeletalQuadrupedRearLegFrame = {
   children: [
     {
       model: Legs.Model.BallSocketJoint,
-      modelParams: [[1, -Math.PI/4, 0], [0, Math.PI/4, 0]],
+      modelParams: [[-Math.PI/2, -Math.PI/4, -0.2], [Math.PI/2, Math.PI/4, 0.2]],
       snapPointParent: [1, 0, 0],
       snapPointChild: [0, 0, 1],
       child: SkeletalQuadrupedRearLeg
     },
     {
       model: Legs.Model.BallSocketJoint,
-      modelParams: [[1, -Math.PI/4, 0], [0, Math.PI/4, 0]],
+      modelParams: [[-Math.PI/2, -Math.PI/4, -0.2], [Math.PI/2, Math.PI/4, 0.2]],
       snapPointParent: [-1, 0, 0],
       snapPointChild: [0, 0, 1],
       child: SkeletalQuadrupedRearLeg
@@ -99,14 +99,14 @@ var SkeletalQuadrupedFrontLegFrame = {
   children: [
     {
       model: Legs.Model.BallSocketJoint,
-      modelParams: [[-Math.PI/2, -Math.PI/4, -Math.PI/8], [Math.PI/2, Math.PI/4, Math.PI/8]],
+      modelParams: [[-Math.PI/2, -Math.PI/4, -0.2], [Math.PI/2, Math.PI/4, 0.2]],
       snapPointParent: [1, 0, 0],
       snapPointChild: [0, 0, 1],
       child: SkeletalQuadrupedFrontLeg
     },
     {
       model: Legs.Model.BallSocketJoint,
-      modelParams: [[-Math.PI/2, -Math.PI/4, -Math.PI/8], [Math.PI/2, Math.PI/4, Math.PI/8]],
+      modelParams: [[-Math.PI/2, -Math.PI/4, -0.2], [Math.PI/2, Math.PI/4, 0.2]],
       snapPointParent: [-1, 0, 0],
       snapPointChild: [0, 0, 1],
       child: SkeletalQuadrupedFrontLeg

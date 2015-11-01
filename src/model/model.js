@@ -300,6 +300,73 @@ Bone.prototype.buildVisual = function() {
   this.visual.add(mesh);
 };
 
+var Foot = function(mass, size) {
+  this.base.call(this, mass, size);
+  this.collisionGroup = CollisionGroup.BONE;
+};
+
+extend(Foot, RigidBody);
+
+Foot.prototype.buildRigidBody = function() {
+  /* sets up the motion state from the current transform */
+  var t = new Ammo.btTransform();
+  three2BulletTransform(this.transform, t);
+  var motionState = new Ammo.btDefaultMotionState(t);
+  
+  var localInertia = new Ammo.btVector3(0, 0, 0);
+  var halfExtents = new Ammo.btVector3(0.9*this.size.x, 0.9*this.size.y, 0.9*this.size.z);
+  var shape = new Ammo.btCompoundShape();
+
+  var foot = new Ammo.btBoxShape(halfExtents);
+
+  t.setRotation(new Ammo.btQuaternion(0, 0, Math.sin(Math.PI/4), Math.cos(Math.PI/4)));
+  
+  var heel = new Ammo.btSphereShape(2.1*this.size.y);
+  t.setOrigin(new Ammo.btVector3(0, 0, 0.75 * this.size.z));
+  shape.addChildShape(t, heel);
+
+  halfExtents.setValue(1.1*this.size.y, 0.9*this.size.x, 1.1*this.size.y);
+  var toe = new Ammo.btCylinderShape(halfExtents);
+  t.setOrigin(new Ammo.btVector3(0, -0.7*this.size.y, -0.5*this.size.z));
+  shape.addChildShape(t, toe);
+  
+  shape.calculateLocalInertia(this.mass,localInertia);
+  var rbInfo = new Ammo.btRigidBodyConstructionInfo(this.mass, motionState, 
+                                                    shape, localInertia);
+  this.body = new Ammo.btRigidBody(rbInfo);
+
+  Ammo.destroy(t);
+  Ammo.destroy(halfExtents);
+  Ammo.destroy(localInertia);
+  Ammo.destroy(rbInfo);
+};
+
+Foot.prototype.buildVisual = function() {
+  var mesh = new THREE.Mesh(new THREE.BoxGeometry(1.8*this.size.x, 1.8*this.size.y, 1.8*this.size.z), 
+                            new THREE.MeshLambertMaterial({color: 0x66a5ff}));
+  mesh.receiveShadow = true;
+  mesh.castShadow = true;
+
+  var heelMesh = new THREE.Mesh(new THREE.SphereGeometry(2.1*this.size.y), 
+                                new THREE.MeshLambertMaterial({color: 0x66a5ff}));
+  heelMesh.receiveShadow = true;
+  heelMesh.castShadow = true;
+  heelMesh.position.set(0, 0, 0.75 * this.size.z);
+  heelMesh.rotation.z = Math.PI/2;
+
+  var toeMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.1*this.size.y, 1.1*this.size.y, 1.8*this.size.x), 
+                               new THREE.MeshLambertMaterial({color: 0x66a5ff}));
+  toeMesh.receiveShadow = true;
+  toeMesh.castShadow = true;
+  toeMesh.position.set(0, -0.7*this.size.y, -0.5 * this.size.z);
+  toeMesh.rotation.z = Math.PI/2;
+
+  this.visual = new THREE.Object3D();
+  this.visual.add(mesh);
+  this.visual.add(heelMesh);
+  this.visual.add(toeMesh);
+};
+
 var Ground = function(size) {
   this.base.call(this, 0, size);
   this.collisionGroup = CollisionGroup.GROUND;
@@ -482,4 +549,5 @@ module.exports.Joint = Joint;
 module.exports.HingeJoint = HingeJoint;
 module.exports.BallSocketJoint = BallSocketJoint;
 module.exports.Bone = Bone;
+module.exports.Foot = Foot;
 module.exports.Ground = Ground;

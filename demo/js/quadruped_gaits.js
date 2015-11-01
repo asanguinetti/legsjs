@@ -50,13 +50,13 @@ QuadrupedWalkingGait.prototype.update = function(timeStep) {
 var QuadrupedWalkingGaitRear = function() {
   this.base.call(this);
   /* swh, swk, swa, swt */
-  this.liftTargets[0] = [0.45, -1.6, 1.1, Math.PI/2];
+  this.liftTargets[0] = [0.5, -1.6, 1.1, Math.PI/2];
   /* sth, stk, sta, stt */
-  this.liftTargets[1] = [0.1, -0.65, 0.5, Math.PI/2 - 0.5];
+  this.liftTargets[1] = [0.1, -0.65, 0.7, Math.PI/2 - 0.5];
   /* swh, swk, swa, swt */
-  this.strikeTargets[0] = [0.1, -0.65, 0.5, Math.PI/2 - 0.5];
+  this.strikeTargets[0] = [0.1, -0.65, 0.7, Math.PI/2 - 0.5];
   /* sth, stk, sta, stt */
-  this.strikeTargets[1] = [0.1, -0.65, 0.5, Math.PI/2 - 0.5];
+  this.strikeTargets[1] = [0.1, -0.65, 0.7, Math.PI/2 - 0.5];
 };
 
 extend(QuadrupedWalkingGaitRear, QuadrupedWalkingGait);
@@ -64,13 +64,13 @@ extend(QuadrupedWalkingGaitRear, QuadrupedWalkingGait);
 var QuadrupedWalkingGaitFront = function() {
   this.base.call(this);
   /* swh, swk, swa, swt */
-  this.liftTargets[0] = [-0.4, 1.4, -1.7, Math.PI/2];
+  this.liftTargets[0] = [-0.45, 1.6, -1.8, Math.PI/2];
   /* sth, stk, sta, stt */
-  this.liftTargets[1] = [-0.15, 0.2, -0.1, Math.PI/2 - 0.2];
+  this.liftTargets[1] = [-0.18, 0.3, -0.3, Math.PI/2 - 0.2];
   /* swh, swk, swa, swt */
-  this.strikeTargets[0] = [-0.15, 0.2, -0.1, Math.PI/2 - 0.2];
+  this.strikeTargets[0] = [-0.18, 0.3, -0.3, Math.PI/2 - 0.2];
   /* sth, stk, sta, stt */
-  this.strikeTargets[1] = [-0.15, 0.2, -0.1, Math.PI/2 - 0.2];
+  this.strikeTargets[1] = [-0.18, 0.3, -0.3, Math.PI/2 - 0.2];
 
   this.stateStanceLeg = [
     1, 1, 0, 0
