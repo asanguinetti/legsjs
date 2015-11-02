@@ -39,6 +39,7 @@ Demo.prototype.setUpScene = function(viewport) {
   this.scene.renderer.shadowMapEnabled = true;
   this.scene.renderer.shadowMapSoft = true;
   viewport.appendChild(this.scene.renderer.domElement);
+  window.addEventListener('keydown', bind(this, this.onKeyDown));
   this.scene.renderer.domElement.addEventListener('touchstart', bind(this, this.onTouchStart));
   this.scene.renderer.domElement.addEventListener('touchmove', bind(this, this.onMouseMove));
   this.scene.renderer.domElement.addEventListener("mousewheel", bind(this, this.onMouseWheel), false);
@@ -89,11 +90,16 @@ Demo.prototype.setUpPhysics = function() {
   var dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
   var overlappingPairCache = new Ammo.btDbvtBroadphase();
   var solver = new Ammo.btSequentialImpulseConstraintSolver();
-  // this.scene.debugDrawer = new DebugDrawer();
+  this.scene.debugDrawer = new DebugDrawer(this.scene);
   this.scene.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
-  // this.scene.world.setDebugDrawer(this.scene.debugDrawer.btDebugDrawer);
+  this.scene.world.setDebugDrawer(this.scene.debugDrawer.btDebugDrawer);
   this.scene.world.setGravity(new Ammo.btVector3(0,0,-20));
   this.scene.world.bodies = [];
+};
+
+Demo.prototype.onKeyDown = function(event) {
+  if( event.key !== 'undefined' && ( event.key == '1' || event.keyCode == 49 ) )
+    this.scene.debugDrawer.toggle();
 };
 
 Demo.prototype.onTouchStart = function(event) {
@@ -277,8 +283,8 @@ Demo.prototype.updateVisuals = function() {
   this.scene.world.bodies.forEach(function(b) {
     b.updateVisual();
   });
-  // this.scene.world.debugDrawWorld();
-  // this.scene.debugDrawer.clear();
+  this.scene.world.debugDrawWorld();
+  this.scene.debugDrawer.beforeFrame();
 };
 
 Demo.prototype.animate = function() {
@@ -348,39 +354,50 @@ Force.prototype.buildAndInsert = function(scene) {
   scene.add(this.arrow);
 };
 
-var DebugDrawer = function() {
+var DebugDrawer = function(scene) {
   var wrappedFrom;
   var wrappedTo;
   var wrappedColor;
   var line;
+  
+  this.enabled = false;
 
-  this.debugMode = 0 | (1 << 11) | (1 << 12);
+  this.debugMode = 1 | (1 << 3) | (1 << 11) | (1 << 12);
   this.objIndex = 0;
   this.objects = [];
-  for(var i = 0; i < 1500; i++)
-  {
-    this.objects.push(new THREE.Line(new THREE.Geometry(), 
-                                     new THREE.LineBasicMaterial({color: new THREE.Color()})));
-    this.objects[i].geometry.vertices.push(new THREE.Vector3());
-    this.objects[i].geometry.vertices.push(new THREE.Vector3());
-  }
+  this.scene = scene;
   this.btDebugDrawer = new Ammo.DebugDraw();
   this.btDebugDrawer.userData = this;
   this.btDebugDrawer.drawLine = function(from, to, color) {
+    if(!this.enabled)
+      return;
     wrappedFrom = Ammo.wrapPointer(from, Ammo.btVector3);
     wrappedTo = Ammo.wrapPointer(to, Ammo.btVector3);
     wrappedColor = Ammo.wrapPointer(color, Ammo.btVector3);
 
-    line = this.userData.objects[this.userData.objIndex++];
+    line = this.userData.getLine();
     line.material.color.setRGB(wrappedColor.x(), wrappedColor.y(), wrappedColor.z());
     line.geometry.vertices[0].set(wrappedFrom.x(), wrappedFrom.y(), wrappedFrom.z());
     line.geometry.vertices[1].set(wrappedTo.x(), wrappedTo.y(), wrappedTo.z());
     line.geometry.verticesNeedUpdate = true;
-
-    scene.add(line);
+    line.visible = true;
   };
   this.btDebugDrawer.drawContactPoint = function(PointOnB, normalOnB, distance, lifeTime, color) {
-    // TODO: implement
+    if(!this.enabled)
+      return;
+    wrappedFrom = Ammo.wrapPointer(PointOnB, Ammo.btVector3);
+    wrappedTo = Ammo.wrapPointer(normalOnB, Ammo.btVector3);
+    wrappedColor = Ammo.wrapPointer(color, Ammo.btVector3);
+
+    line = this.userData.getLine();
+    line.material.color.setRGB(wrappedColor.x(), wrappedColor.y(), wrappedColor.z());
+    line.geometry.vertices[0].set(wrappedFrom.x(), wrappedFrom.y(), wrappedFrom.z());
+    line.geometry.vertices[1].copy(line.geometry.vertices[0]);
+    line.geometry.vertices[1].x += wrappedTo.x();
+    line.geometry.vertices[1].x += wrappedTo.y();
+    line.geometry.vertices[1].x += wrappedTo.z();
+    line.geometry.verticesNeedUpdate = true;
+    line.visible = true;
   };
   this.btDebugDrawer.reportErrorWarning = function(warningString) {
     console.log(warningString);
@@ -396,6 +413,26 @@ var DebugDrawer = function() {
   };
 };
 
-DebugDrawer.prototype.clear = function() {
+DebugDrawer.prototype.getLine = function() {
+  while(this.objIndex >= this.objects.length)
+  {
+    var line = new THREE.Line(new THREE.Geometry(), 
+                              new THREE.LineBasicMaterial({color: new THREE.Color()}));
+    this.objects.push(line);
+    line.geometry.vertices.push(new THREE.Vector3());
+    line.geometry.vertices.push(new THREE.Vector3());
+    this.scene.add(line);
+  }
+  return this.objects[this.objIndex++];
+};
+
+DebugDrawer.prototype.beforeFrame = function() {
+  for(var i = this.objIndex; i < this.objects.length; i++) {
+    this.objects[i].visible = false;
+  };
   this.objIndex = 0;
+};
+
+DebugDrawer.prototype.toggle = function() {
+  this.btDebugDrawer.enabled = !this.btDebugDrawer.enabled;
 };
