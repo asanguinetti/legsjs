@@ -59,20 +59,23 @@ Demo.prototype.setUpScene = function(viewport) {
   this.scene.add(this.scene.camera);
   
   // Light
-  var light = new THREE.DirectionalLight(0xFFFFFF);
-  light.position.set( -15, 20, 40 );
-  light.target.position.copy(this.scene.position);
-  light.castShadow = true;
-  light.shadowCameraLeft = -60;
-  light.shadowCameraTop = -60;
-  light.shadowCameraRight = 60;
-  light.shadowCameraBottom = 60;
-  light.shadowCameraNear = 20;
-  light.shadowCameraFar = 200;
-  light.shadowBias = -.0005
-  light.shadowMapWidth = light.shadowMapHeight = 2048;
-  light.shadowDarkness = .7;
-  this.scene.add(light);
+  this.scene.light = new THREE.DirectionalLight(0xFFFFFF);
+  this.scene.light.relPos = new THREE.Vector3( -7, 10, 20 );
+  this.scene.light.position.copy( this.scene.light.relPos );
+  this.scene.light.target.position.copy(this.scene.position);
+  this.scene.light.castShadow = true;
+  this.scene.light.shadowCameraLeft = -15;
+  this.scene.light.shadowCameraTop = -15;
+  this.scene.light.shadowCameraRight = 15;
+  this.scene.light.shadowCameraBottom = 15;
+  this.scene.light.shadowCameraNear = 10;
+  this.scene.light.shadowCameraFar = 40;
+  this.scene.light.shadowBias = -.0005
+  this.scene.light.shadowMapWidth = this.scene.light.shadowMapHeight = 2048;
+  this.scene.light.shadowDarkness = .7;
+  // uncomment the following line to enable shadow camera debug drawing
+  // this.scene.light.shadowCameraVisible = true;
+  this.scene.add(this.scene.light);
 
   this.raycaster = new THREE.Raycaster();
   this.thrownBoxes = [];
@@ -257,6 +260,9 @@ Demo.prototype.updateCamera = function()
   this.scene.camera.position.add(this.scene.camera.target.visual.position);
   this.scene.camera.position.z = Math.max(this.scene.camera.position.z, 1);
   this.scene.camera.lookAt(this.scene.camera.target.visual.position);
+
+  this.scene.light.target = this.scene.camera.target.visual;
+  this.scene.light.position.addVectors(this.scene.light.target.position, this.scene.light.relPos);
 };
 
 Demo.prototype.updatePhysics = function() {
