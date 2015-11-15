@@ -206,6 +206,7 @@ Leg.prototype.getFootPos = function() {
 
 var LegFrame = function(gait, rootSkSgmt, controlParams) {
   this.heading = 0;
+  this.targetVel = new THREE.Vector3(0, 0, 0);
   
   this.fbP = new THREE.Vector3();
   this.fbD = new THREE.Vector3();
@@ -224,7 +225,12 @@ var LegFrame = function(gait, rootSkSgmt, controlParams) {
 
   this.vts = [
     this.orientationVT = new THREE.Vector3()
-  ]
+  ];
+
+  this.vfs = [
+    this.cmVelVF = new THREE.Vector3()
+  ];
+  this.vfTotal = new THREE.Vector3();
 
   this.auxVect3 = new THREE.Vector3();
 };
@@ -232,6 +238,9 @@ var LegFrame = function(gait, rootSkSgmt, controlParams) {
 LegFrame.prototype.update = function(timeStep) {
   /* advances the gait */
   this.gait.update(timeStep);
+
+  /* computes the center of mass position and velocity */
+  this.computeCOMPosNVel();
 
   /* computes the feedback angles */
   this.computeFeedbackAngles();
@@ -257,6 +266,12 @@ LegFrame.prototype.update = function(timeStep) {
 
   /* adds all the virtual torques to the tracking torques */
   this.addVTs();
+
+  /* computes the velocity tracking virtual force */
+  this.computeCMVelVF();
+
+  /* adds all the virtual forces */
+  this.addVFs();
 
   /* applies the torques */
   for(var i = 0; i < this.legs.length; i++)
@@ -290,6 +305,46 @@ LegFrame.prototype.addVTs = function() {
         addVT(this.vts[j], this.legs[i].joints);
 };
 
+LegFrame.prototype.addVFToJoint = function(vf, p, j)
+{
+  var axes = j.model.getAxes();
+  var b = j.model.getPosition();
+  var aux = this.auxVect3;
+  b.subVectors(p, b);
+  for(var i = 0; i < axes.length; i++)
+  {
+    var a = axes[i];
+    aux.crossVectors(a, b);
+    j.torque.add(a.multiplyScalar(aux.dot(vf)))
+  }
+};
+
+LegFrame.prototype.addVFs = function() {
+  /* TODO: this has a lot in common with addVTs */
+  this.vfTotal.set(0, 0, 0);
+  for(var i = 0; i < this.vfs.length; i++)
+    this.vfTotal.add(this.vfs[i]);
+
+  /* counts the stance legs */
+  var numStanceLegs = 0;
+  for(var i = 0; i < this.legs.length; i++)
+    if(this.gait.isStanceLeg(i))
+      numStanceLegs++;
+
+  /* if there are no stance legs, no virtual forces are added */
+  if(numStanceLegs == 0)
+    return;
+
+  /* splits the virtual force equally among the stance legs */
+  this.vfTotal.multiplyScalar(1/numStanceLegs);
+
+  /* adds the total virtual force to each stance leg */
+  for(var i = 0; i < this.legs.length; i++)
+    if(this.gait.isStanceLeg(i))
+      for(var j = 0; j < this.legs[i].joints.length; j++)
+        this.addVFToJoint(this.vfTotal, this.COMPos, this.legs[i].joints[j]);
+};
+
 LegFrame.prototype.computeOrientationVT = function() {
   var targetQ = new THREE.Quaternion();
   targetQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.heading);
@@ -302,6 +357,12 @@ LegFrame.prototype.computeOrientationVT = function() {
   this.orientationVT.applyQuaternion(this.trunk.getOrientation());
   return this.orientationVT;
 };
+
+LegFrame.prototype.computeCMVelVF = function() {
+  this.cmVelVF.subVectors(this.COMVel, this.targetVel);
+  this.cmVelVF.z = 0;
+  this.cmVelVF.multiplyScalar(this.controlParams.positionVF.pdGains[1]);
+}
 
 LegFrame.prototype.computeCOMPosNVel = function() {
   var aux = this.auxVect3.set(0, 0, 0);
@@ -352,7 +413,6 @@ LegFrame.prototype.computeFeedbackAngles = function() {
 
   if(numStanceLegs > 0)
   {
-    this.computeCOMPosNVel();
     this.fbP.copy(this.COMPos);
     this.fbD.copy(this.COMVel);
     this.standWorldPos.multiplyScalar(1/numStanceLegs);
@@ -360,6 +420,8 @@ LegFrame.prototype.computeFeedbackAngles = function() {
     this.fbP.z = 0;
     this.fbP.applyQuaternion(this.trunk.getHeading().conjugate());
 
+    this.fbD.sub(this.targetVel);
+    this.fbD.z = 0;
     this.fbD.applyQuaternion(this.trunk.getHeading().conjugate());
   }
   else

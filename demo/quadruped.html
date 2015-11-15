@@ -38,8 +38,10 @@
     var controlParams = {
       orientationVT: {
         torqueLimit: 1000,
-        pdGains: [3000, -500],
-        fbGains: [0, 0]
+        pdGains: [3000, -500]
+      },
+      positionVF: {
+        pdGains: [2000, -50]
       },
       joints: [
         {

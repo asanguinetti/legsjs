@@ -470,16 +470,23 @@ Joint.prototype.buildAndInsert = function(scene) {
   throw "Unsupported operation";
 };
 
+Joint.prototype.getAxes = function() {
+  throw "Unsupported operation";
+};
+
 var HingeJoint = function(bodyA, bodyB, pivotInA, pivotInB, lowerLimit, higherLimit) {
   this.base.call(this, bodyA, bodyB, pivotInA, pivotInB);
   this.lowerLimit = lowerLimit;
   this.higherLimit = higherLimit;
+  /* TODO: axis is hardcoded */
+  this.axis = new THREE.Vector3(1, 0, 0);
+  this.axes = [new THREE.Vector3()];
 }
 
 extend(HingeJoint, Joint);
 
 HingeJoint.prototype.buildAndInsert = function(scene) {
-  var xAxis = new Ammo.btVector3(1, 0, 0);
+  var btAxis = new Ammo.btVector3(this.axis.x, this.axis.y, this.axis.z);
   var btPivotInA = new Ammo.btVector3(this.pivotInA.x,
                                       this.pivotInA.y,
                                       this.pivotInA.z);
@@ -490,21 +497,29 @@ HingeJoint.prototype.buildAndInsert = function(scene) {
                                       this.bodyB.body,
                                       btPivotInA,
                                       btPivotInB,
-                                      xAxis, xAxis, true);
+                                      btAxis, btAxis, true);
 
   this.c.setLimit(this.lowerLimit, this.higherLimit);
 
   scene.world.addConstraint(this.c, true);
 
-  Ammo.destroy(xAxis);
+  Ammo.destroy(btAxis);
   Ammo.destroy(btPivotInA);
   Ammo.destroy(btPivotInB);
+};
+
+HingeJoint.prototype.getAxes = function() {
+  var a = this.axes[0];
+  a.set(1, 0, 0);
+  a.applyQuaternion(this.bodyA.getOrientation());
+  return this.axes;
 };
 
 var BallSocketJoint = function(bodyA, bodyB, pivotInA, pivotInB, angularLowerLimit, angularUpperLimit) {
   this.base.call(this, bodyA, bodyB, pivotInA, pivotInB);
   this.angularLowerLimit = angularLowerLimit;
   this.angularUpperLimit = angularUpperLimit;
+  this.axes = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
 }
 
 extend(BallSocketJoint, Joint);
@@ -543,6 +558,16 @@ BallSocketJoint.prototype.buildAndInsert = function(scene) {
   Ammo.destroy(btVector3);
   Ammo.destroy(frameInB);
   Ammo.destroy(frameInA);
+};
+
+BallSocketJoint.prototype.getAxes = function() {
+  var a;
+  for(var i = 0; i < this.axes.length; i++)
+  {
+    a = this.c.getAxis(i);
+    this.axes[i].set(a.x(), a.y(), a.z());
+  }
+  return this.axes;
 };
 
 module.exports.Joint = Joint;
