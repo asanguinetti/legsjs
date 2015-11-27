@@ -50,7 +50,7 @@
         {
           torqueLimit: 1000,
           pdGains: [1500, 300],
-          fbGains: [0.10, 0.10]
+          fbGains: [0.06, 0.10]
         },
         {
           torqueLimit: 1000,
@@ -59,7 +59,7 @@
         },
         {
           torqueLimit: 1000,
-          pdGains: [1500, 300],
+          pdGains: [1000, 100],
           fbGains: [0, 0]
         }
       ]
@@ -95,8 +95,11 @@
 
       if(window.location.hash === '#heading')
       {
-        var input = document.querySelector("#heading input");
-        legFrame.heading = input.value;
+        var heading = parseFloat(document.querySelector("#heading input[name=heading]").value);
+        legFrame.heading = heading;
+
+        var speed = parseFloat(document.querySelector("#heading input[name=speed]").value);
+        legFrame.targetVel.set(0, speed, 0);
       }
 
       /* iterates over the contact manifolds to check if any leg is touching the ground */
@@ -171,6 +174,7 @@
     <div id="heading">
       <p>
         <label>heading </label><input type="number" step="0.1" name="heading" value="0" />
+        <label>speed </label><input type="number" step="0.1" name="speed" value="0" />
       </p>
     </div>
   </div>

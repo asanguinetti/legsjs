@@ -207,6 +207,7 @@ Leg.prototype.getFootPos = function() {
 var LegFrame = function(gait, rootSkSgmt, controlParams) {
   this.heading = 0;
   this.targetVel = new THREE.Vector3(0, 0, 0);
+  this.targetVelWorld = new THREE.Vector3(0, 0, 0);
   
   this.fbP = new THREE.Vector3();
   this.fbD = new THREE.Vector3();
@@ -359,7 +360,12 @@ LegFrame.prototype.computeOrientationVT = function() {
 };
 
 LegFrame.prototype.computeCMVelVF = function() {
-  this.cmVelVF.subVectors(this.COMVel, this.targetVel);
+  /* computes the target velocity in world coordinates */
+  this.targetVelWorld.copy(this.targetVel);
+  this.targetVelWorld.applyQuaternion(this.trunk.getOrientation());
+
+  /* computes the difference in velocity and multiplies by a constant factor */
+  this.cmVelVF.subVectors(this.COMVel, this.targetVelWorld);
   this.cmVelVF.z = 0;
   this.cmVelVF.multiplyScalar(this.controlParams.positionVF.pdGains[1]);
 }
@@ -420,7 +426,6 @@ LegFrame.prototype.computeFeedbackAngles = function() {
     this.fbP.z = 0;
     this.fbP.applyQuaternion(this.trunk.getHeading().conjugate());
 
-    this.fbD.sub(this.targetVel);
     this.fbD.z = 0;
     this.fbD.applyQuaternion(this.trunk.getHeading().conjugate());
   }
