@@ -133,10 +133,6 @@ Joint.prototype.computeTorque = function(charFrame) {
 };
 
 Joint.prototype.applyTorque = function() {
-  var dir = new THREE.Vector3(0, 0, 0);
-  dir.copy(this.torque);
-  dir.normalize();
-
   this.btTorque.setValue(this.torque.x, this.torque.y, this.torque.z);
   /* applies the equal and opposite torques to both objects */
   this.bodyA.body.applyTorque(this.btTorque);
@@ -151,6 +147,7 @@ var Leg = function(initialAngles, rootSkJoint, controlParams) {
   this.time = 0;
   this.controlParams = controlParams;
   this.footPos = new THREE.Vector3();
+  this.charFrame = new THREE.Quaternion();
 
   /* adds the joints */
   var absAngle = true;
@@ -179,8 +176,7 @@ var Leg = function(initialAngles, rootSkJoint, controlParams) {
 
 Leg.prototype.computeTorques = function(targetAngles, fbP, fbD) {
   /* computes the character orientation (heading of trunk) */
-  var charFrame = new THREE.Quaternion();
-  charFrame.copy(this.trunk.getHeading());
+  this.charFrame.copy(this.trunk.getHeading());
 
   /* computes the torques for all the joints */
   for(var i = 0; i < this.joints.length; i++) {
@@ -188,7 +184,7 @@ Leg.prototype.computeTorques = function(targetAngles, fbP, fbD) {
     var pitch = fbP.y * fbGains[0] + fbD.y * fbGains[1] + targetAngles[i];
     var roll = -fbP.x * fbGains[0] - fbD.x * fbGains[1];
     this.joints[i].computeTargetQFromRelAngles(pitch, roll);
-    this.joints[i].computeTorque(charFrame);
+    this.joints[i].computeTorque(this.charFrame);
   }
 };
 
@@ -206,6 +202,8 @@ Leg.prototype.getFootPos = function() {
 
 var LegFrame = function(gait, rootSkSgmt, controlParams) {
   this.heading = 0;
+  this.targetQ = new THREE.Quaternion();
+
   this.targetVel = new THREE.Vector3(0, 0, 0);
   this.targetVelWorld = new THREE.Vector3(0, 0, 0);
   
@@ -227,6 +225,7 @@ var LegFrame = function(gait, rootSkSgmt, controlParams) {
   this.vts = [
     this.orientationVT = new THREE.Vector3()
   ];
+  this.vtTotal = new THREE.Vector3();
 
   this.vfs = [
     this.cmVelVF = new THREE.Vector3()
@@ -234,6 +233,7 @@ var LegFrame = function(gait, rootSkSgmt, controlParams) {
   this.vfTotal = new THREE.Vector3();
 
   this.auxVect3 = new THREE.Vector3();
+  this.auxQuat = new THREE.Quaternion();
 };
 
 LegFrame.prototype.update = function(timeStep) {
@@ -246,64 +246,40 @@ LegFrame.prototype.update = function(timeStep) {
   /* computes the feedback angles */
   this.computeFeedbackAngles();
 
+  var numStanceLegs = 0;
   var zero = this.auxVect3.set(0, 0, 0);
-  for(var i = 0; i < this.legs.length; i++)
-  {
-    if(this.gait.isStanceLeg(i))
+  /* computes the tracking torques for all the legs */
+  for(var i = 0; i < this.legs.length; i++) {
+    if(this.gait.isStanceLeg(i)) {
       this.legs[i].computeTorques(this.gait.getAnglesForLeg(i),
                                   zero, zero);
-    else
+      /* resets the tracking torque for the stance hips */
+      this.legs[i].joints[0].torque.set(0, 0, 0);
+
+      /* and counts the stance legs */
+      numStanceLegs++;
+    } else {
       this.legs[i].computeTorques(this.gait.getAnglesForLeg(i),
                                   this.fbP, this.fbD);
+    }
   }
-
-  /* resets the tracking torque for the stance hips */
-  for(var i = 0; i < this.legs.length; i++)
-    if(this.gait.isStanceLeg(i))
-      this.legs[i].joints[0].torque.set(0, 0, 0);
 
   /* computes the trunk's orientation virtual torque */
   this.computeOrientationVT();
 
-  /* adds all the virtual torques to the tracking torques */
-  this.addVTs();
-
   /* computes the velocity tracking virtual force */
   this.computeCMVelVF();
 
-  /* adds all the virtual forces */
-  this.addVFs();
+  /* if there are no stance legs, no virtual torques/forces are added */
+  if(numStanceLegs != 0)
+  {
+    /* adds all the virtual forces and torques */
+    this.addVFTs(numStanceLegs);
+  }
 
   /* applies the torques */
   for(var i = 0; i < this.legs.length; i++)
     this.legs[i].applyTorques();
-};
-
-LegFrame.prototype.addVTs = function() {
-  var addVT = function(vt, joints) {
-    for(var i = 0; i < joints.length; i++)
-      joints[i].torque.add(vt);
-  };
-
-  /* counts the stance legs */
-  var numStanceLegs = 0;
-  for(var i = 0; i < this.legs.length; i++)
-    if(this.gait.isStanceLeg(i))
-      numStanceLegs++;
-
-  /* if there are no stance legs, no virtual torques are added */
-  if(numStanceLegs == 0)
-    return;
-
-  /* splits the virtual torques equally among the stance legs */
-  for(var i = 0; i < this.vts.length; i++)
-    this.vts[i].multiplyScalar(1/numStanceLegs);
-
-  /* adds each virtual torque to each stance leg */
-  for(var i = 0; i < this.legs.length; i++)
-    if(this.gait.isStanceLeg(i))
-      for(var j = 0; j < this.vts.length; j++)
-        addVT(this.vts[j], this.legs[i].joints);
 };
 
 LegFrame.prototype.addVFToJoint = function(vf, p, j)
@@ -320,39 +296,43 @@ LegFrame.prototype.addVFToJoint = function(vf, p, j)
   }
 };
 
-LegFrame.prototype.addVFs = function() {
-  /* TODO: this has a lot in common with addVTs */
+LegFrame.prototype.addVFTs = function(numStanceLegs) {
+  /* computes the total virtual force applied to the CM */
   this.vfTotal.set(0, 0, 0);
   for(var i = 0; i < this.vfs.length; i++)
     this.vfTotal.add(this.vfs[i]);
 
-  /* counts the stance legs */
-  var numStanceLegs = 0;
-  for(var i = 0; i < this.legs.length; i++)
-    if(this.gait.isStanceLeg(i))
-      numStanceLegs++;
-
-  /* if there are no stance legs, no virtual forces are added */
-  if(numStanceLegs == 0)
-    return;
+  /* computes the total virtual torque */
+  this.vtTotal.set(0, 0, 0);
+  for(var i = 0; i < this.vts.length; i++)
+    this.vtTotal.add(this.vts[i]);
 
   /* splits the virtual force equally among the stance legs */
   this.vfTotal.multiplyScalar(1/numStanceLegs);
 
-  /* adds the total virtual force to each stance leg */
-  for(var i = 0; i < this.legs.length; i++)
-    if(this.gait.isStanceLeg(i))
-      for(var j = 0; j < this.legs[i].joints.length; j++)
-        this.addVFToJoint(this.vfTotal, this.COMPos, this.legs[i].joints[j]);
+  /* splits the virtual torque equally among the stance legs */
+  this.vtTotal.multiplyScalar(1/numStanceLegs);
+
+  /* adds the total virtual force and torque to each stance leg */
+  for(var i = 0; i < this.legs.length; i++) {
+    var leg = this.legs[i];
+    if(this.gait.isStanceLeg(i)) {
+      for(var j = 0; j < leg.joints.length; j++) {
+        this.addVFToJoint(this.vfTotal, this.COMPos, leg.joints[j]);
+        leg.joints[j].torque.add(this.vtTotal);
+      }
+    }
+  }
 };
 
 LegFrame.prototype.computeOrientationVT = function() {
-  var targetQ = new THREE.Quaternion();
-  targetQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.heading);
+  this.targetQ.set(0, 0, Math.sin(this.heading/2), Math.cos(this.heading/2));
+
+  this.auxQuat.copy(this.trunk.getOrientation());
 
   computeRelTorque(this.controlParams.orientationVT,
-                   this.trunk.getOrientation().clone(),
-                   targetQ,
+                   this.auxQuat,
+                   this.targetQ,
                    this.trunk.getAngularVelocity().applyQuaternion(this.trunk.getOrientation().conjugate()),
                    this.orientationVT);
   this.orientationVT.applyQuaternion(this.trunk.getOrientation());

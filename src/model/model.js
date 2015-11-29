@@ -31,13 +31,16 @@ var bullet2ThreeTransform = function(bulletT, threeT) {
   if(threeT === undefined)
     t = new THREE.Matrix4();
 
-  var p = new THREE.Vector3(bulletT.getOrigin().x(), 
-                            bulletT.getOrigin().y(), 
-                            bulletT.getOrigin().z());
-  var q = new THREE.Quaternion(bulletT.getRotation().x(), 
-                               bulletT.getRotation().y(), 
-                               bulletT.getRotation().z(), 
-                               bulletT.getRotation().w());
+  var p = bullet2ThreeTransform.p;
+  var q = bullet2ThreeTransform.q;
+
+  p.set(bulletT.getOrigin().x(),
+        bulletT.getOrigin().y(),
+        bulletT.getOrigin().z());
+  q.set(bulletT.getRotation().x(),
+        bulletT.getRotation().y(),
+        bulletT.getRotation().z(),
+        bulletT.getRotation().w());
 
   t.identity();
   t.makeRotationFromQuaternion(q);
@@ -45,6 +48,9 @@ var bullet2ThreeTransform = function(bulletT, threeT) {
 
   return t;
 };
+
+bullet2ThreeTransform.p = new THREE.Vector3();
+bullet2ThreeTransform.q = new THREE.Quaternion();
 
 var extend = function(extended, base) {
   extended.prototype = Object.create(base.prototype);
@@ -72,6 +78,8 @@ var RigidBody = function(mass, size) {
   /* TODO: use a pool instead of this */
   this.btVecAux = new Ammo.btVector3();
   this.btVecAux2 = new Ammo.btVector3();
+
+  this.auxMat4 = new THREE.Matrix4();
 };
 
 RigidBody.prototype.detach = function(scene) {
@@ -106,8 +114,6 @@ RigidBody.prototype.rotateAxis = function(axis, theta, pivot) {
 };
 
 RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
-  var mat4 = new THREE.Matrix4();
-  
   var p = worldPoint;
   if(worldPoint === undefined)
     p = new THREE.Vector3();
@@ -121,16 +127,14 @@ RigidBody.prototype.toWorldFrame = function(localPoint, worldPoint) {
   if(this.body !== undefined)
     t = this.body.getCenterOfMassTransform();
 
-  bullet2ThreeTransform(t, mat4);
+  bullet2ThreeTransform(t, this.auxMat4);
 
-  p.applyMatrix4(mat4);
+  p.applyMatrix4(this.auxMat4);
 
   return p;
 };
 
 RigidBody.prototype.toLocalFrame = function(worldPoint, localPoint) {
-  var mat4 = new THREE.Matrix4();
-  
   var p = localPoint;
   if(localPoint === undefined)
     p = new THREE.Vector3();
@@ -141,10 +145,10 @@ RigidBody.prototype.toLocalFrame = function(worldPoint, localPoint) {
   if(this.body !== undefined)
     t = this.body.getCenterOfMassTransform();
 
-  bullet2ThreeTransform(t, mat4);
+  bullet2ThreeTransform(t, this.auxMat4);
 
-  mat4.getInverse(mat4);
-  p.applyMatrix4(mat4);
+  this.auxMat4.getInverse(this.auxMat4);
+  p.applyMatrix4(this.auxMat4);
 
   return p;
 };
@@ -169,7 +173,7 @@ RigidBody.prototype.getAngularVelocity = function() {
 };
 
 RigidBody.prototype.getOrientation = function() {
-  var q = this.body.getCenterOfMassTransform().getRotation()
+  var q = this.body.getCenterOfMassTransform().getRotation();
   this.q.set(q.x(), q.y(), q.z(), q.w());
 
   return this.q;
@@ -186,19 +190,6 @@ RigidBody.prototype.getHeading = function() {
   rot.y = 0;
   rot.normalize();
   return rot;
-};
-
-RigidBody.prototype.getEulerRotation = function() {
-  var t = this.btTransform;
-  if(this.body !== undefined)
-  {
-    t = this.body.getCenterOfMassTransform();
-  }
-  bullet2ThreeTransform(t, this.transformAux);
-
-  var euler = new THREE.Euler();
-  euler.setFromRotationMatrix(this.transformAux, 'XYZ');
-  return euler.toVector3();
 };
 
 RigidBody.prototype.snapTo = function(snapPoint, bodyB, snapPointB) {
@@ -425,8 +416,8 @@ var Joint = function(bodyA, bodyB, pivotInA, pivotInB) {
   this.curQ = new THREE.Quaternion();
   this.curOmega = new THREE.Vector3();
 
-  var zero = new THREE.Vector3(0, 0, 0);
-  var unit = new THREE.Vector3(1, 0, 0);
+  this.pivotWorldA = new THREE.Vector3();
+  this.pivotWorldB = new THREE.Vector3();
 };
 
 Joint.prototype.detach = function(scene) {
@@ -438,10 +429,10 @@ Joint.prototype.destroy = function() {
 };
 
 Joint.prototype.getPosition = function() {
-  var pivotWorldA = this.bodyA.toWorldFrame(this.pivotInA);
-  var pivotWorldB = this.bodyB.toWorldFrame(this.pivotInB);
-  pivotWorldA.lerp(pivotWorldB, 0.5);
-  return pivotWorldA;
+  this.bodyA.toWorldFrame(this.pivotInA, this.pivotWorldA);
+  this.bodyB.toWorldFrame(this.pivotInB, this.pivotWorldA);
+  this.pivotWorldA.lerp(this.pivotWorldA, 0.5);
+  return this.pivotWorldA;
 };
 
 Joint.prototype.getRelativeOrientation = function() {
@@ -510,7 +501,7 @@ HingeJoint.prototype.buildAndInsert = function(scene) {
 
 HingeJoint.prototype.getAxes = function() {
   var a = this.axes[0];
-  a.set(1, 0, 0);
+  a.copy(this.axis);
   a.applyQuaternion(this.bodyA.getOrientation());
   return this.axes;
 };
