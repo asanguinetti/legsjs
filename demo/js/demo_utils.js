@@ -25,6 +25,7 @@ var Demo = function(viewport) {
   this.m3 = new THREE.Matrix4();
   this.time_last = Date.now();
   this.time_delta = 0;
+  this.keysPressed = {};
 
   this.scene = new THREE.Scene();
 
@@ -40,6 +41,7 @@ Demo.prototype.setUpScene = function(viewport) {
   this.scene.renderer.shadowMapSoft = true;
   viewport.appendChild(this.scene.renderer.domElement);
   window.addEventListener('keydown', bind(this, this.onKeyDown));
+  window.addEventListener('keyup', bind(this, this.onKeyUp));
   this.scene.renderer.domElement.addEventListener('touchstart', bind(this, this.onTouchStart));
   this.scene.renderer.domElement.addEventListener('touchmove', bind(this, this.onMouseMove));
   this.scene.renderer.domElement.addEventListener("mousewheel", bind(this, this.onMouseWheel), false);
@@ -83,6 +85,9 @@ Demo.prototype.setUpScene = function(viewport) {
 
   this.mouseDownPos = new THREE.Vector2();
   this.mouseDragging = false;
+
+  this.heading = document.querySelector("#heading input[name=heading]");
+  this.speed = document.querySelector("#heading input[name=speed]");
 };
 
 Demo.prototype.setUpPhysics = function() {
@@ -98,7 +103,19 @@ Demo.prototype.setUpPhysics = function() {
 };
 
 Demo.prototype.onKeyDown = function(event) {
-  if( event.key !== 'undefined' && ( event.key == '1' || event.keyCode == 49 ) )
+  if(typeof event == 'undefined')
+    event = window.event;
+
+  this.keysPressed[event.keyCode] = true;
+};
+
+Demo.prototype.onKeyUp = function(event) {
+  if(typeof event == 'undefined')
+    event = window.event;
+
+  this.keysPressed[event.keyCode] = false;
+
+  if(event.keyCode == 49) /* '1' */
     this.scene.debugDrawer.toggle();
 };
 
@@ -271,11 +288,9 @@ Demo.prototype.updateCamera = function()
   this.scene.light.position.addVectors(this.scene.light.target.position, this.scene.light.relPos);
 };
 
-Demo.prototype.updatePhysics = function() {
+Demo.prototype.updatePhysics = function(time_delta) {
     /* steps world */
-    this.time_delta = Date.now() - this.time_last;
-    this.scene.world.stepSimulation(this.time_delta / 1000.0, 1500, 1 / 2000);
-    this.time_last += this.time_delta;
+    this.scene.world.stepSimulation(time_delta / 1000.0, 1500, 1 / 2000);
 };
 
 Demo.prototype.updateVisuals = function() {
@@ -287,11 +302,26 @@ Demo.prototype.updateVisuals = function() {
   this.scene.debugDrawer.beforeFrame();
 };
 
+Demo.prototype.handleKeyEvents = function(time_delta) {
+  var time_delta_secs = time_delta / 1000.0;
+  if(this.keysPressed[65]) /* 'a' */
+    this.heading.value = parseFloat(this.heading.value) + 1.5 * time_delta_secs;
+  if(this.keysPressed[68]) /* 'd' */
+    this.heading.value = parseFloat(this.heading.value) - 1.5 * time_delta_secs;
+  if(this.keysPressed[87]) /* 'w' */
+    this.speed.value = parseFloat(this.speed.value) + 3 * time_delta_secs;
+  if(this.keysPressed[83]) /* 's' */
+    this.speed.value = parseFloat(this.speed.value) - 3 * time_delta_secs;
+};
+
 Demo.prototype.animate = function() {
+  this.time_delta = Date.now() - this.time_last;
+  this.time_last += this.time_delta;
   requestAnimationFrame(bind(this, this.animate));
+  this.handleKeyEvents(this.time_delta);
   this.updateCamera();
   this.updateVisuals();
-  this.updatePhysics();
+  this.updatePhysics(this.time_delta);
   this.scene.renderer.clear();
   this.scene.renderer.render(this.scene, this.scene.camera);
 };
