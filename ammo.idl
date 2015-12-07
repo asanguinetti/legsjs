@@ -133,6 +133,8 @@ interface btManifoldPoint {
   [Value] attribute btVector3 m_positionWorldOnB;
   [Value] attribute btVector3 m_positionWorldOnA;
   [Value] attribute btVector3 m_normalWorldOnB;
+  attribute long m_lifeTime;
+  attribute float m_appliedImpulse;
 };
 
 [Prefix="btCollisionWorld::"]

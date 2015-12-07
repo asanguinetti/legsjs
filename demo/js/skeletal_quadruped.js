@@ -25,7 +25,7 @@ var SkeletalQuadrupedRearLeg = {
                   snapPointParent: [0, 0, -1],
                   snapPointChild: [0, 0, 0.5],
                   child: {
-                    model: Legs.Model.Foot, mass: 1, size: [0.3, 0.1, 0.4]
+                    model: Legs.Model.Bone, mass: 1, size: [0.3, 0.1, 0.4]
                   }
                 }
               ]
@@ -62,7 +62,7 @@ var SkeletalQuadrupedFrontLeg = {
                   snapPointParent: [0, 0, -1],
                   snapPointChild: [0, 0, 0.5],
                   child: {
-                    model: Legs.Model.Foot, mass: 1, size: [0.3, 0.1, 0.4]
+                    model: Legs.Model.Bone, mass: 1, size: [0.3, 0.1, 0.4]
                   }
                 }
               ]

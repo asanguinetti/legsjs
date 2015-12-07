@@ -19,33 +19,33 @@ var QuadrupedWalkingGait = function() {
     this.strikeTargets
   ];
 
-  this.stateStanceLeg = [
-    0, 0, 1, 1
+  this.stateSwingLeg = [
+    1, 1, 0, 0
+  ];
+
+  this.inContact = [
+    false, false
+  ];
+
+  var self = this;
+
+  var timedTransition = function() {
+    return 0.3 < self.stateTime;
+  }
+
+  var contactTransition = function() {
+    return self.inContact[self.stateSwingLeg[self.state]];
+  }
+
+  this.transitions = [
+    timedTransition,
+    contactTransition,
+    timedTransition,
+    contactTransition
   ];
 };
 
 extend(QuadrupedWalkingGait, Legs.Control.Gait);
-
-QuadrupedWalkingGait.prototype.setContactForLeg = function(i, contact) {
-  if((this.state == 1 && i == 1) || (this.state == 3 && i == 0)) {
-    if(contact) {
-      this.state += 1;
-      this.state %= 4;
-      this.stateTime = 0;
-    }
-  }
-};
-
-QuadrupedWalkingGait.prototype.update = function(timeStep) {
-  this.stateTime += timeStep;
-  if(this.state == 0 || this.state == 2) {
-    if(this.stateTime > 0.3) {
-      this.state += 1;
-      this.state %= 4;
-      this.stateTime = 0;
-    }
-  }
-};
 
 var QuadrupedWalkingGaitRear = function() {
   this.base.call(this);
@@ -72,8 +72,8 @@ var QuadrupedWalkingGaitFront = function() {
   /* sth, stk, sta, stt */
   this.strikeTargets[1] = [-0.18, 0.3, -0.3, Math.PI/2 - 0.2];
 
-  this.stateStanceLeg = [
-    1, 1, 0, 0
+  this.stateSwingLeg = [
+    0, 0, 1, 1
   ];
 };
 

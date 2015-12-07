@@ -70,15 +70,32 @@ var Gait = function() {
 };
 
 Gait.prototype.setContactForLeg = function(i, contact) {
-  throw 'Operation not supported';
+  this.inContact[i] = contact;
+  this.checkForTransitions();
 };
 
 Gait.prototype.update = function(timeStep) {
-  throw 'Operation not supported';
+  this.stateTime += timeStep;
+  this.checkForTransitions();
+};
+
+Gait.prototype.isInContact = function(i) {
+  return this.inContact[i];
 };
 
 Gait.prototype.isStanceLeg = function(i) {
-  return this.stateStanceLeg[this.state] == i;
+  return this.stateSwingLeg[this.state] != i;
+};
+
+Gait.prototype.advanceState = function() {
+  this.state += 1;
+  this.state %= this.stateTargets.length;
+  this.stateTime = 0;
+};
+
+Gait.prototype.checkForTransitions = function() {
+  while(this.transitions[this.state]())
+    this.advanceState();
 };
 
 Gait.prototype.getAnglesForLeg = function(i) {

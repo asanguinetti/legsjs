@@ -22,7 +22,6 @@
   
   var initScene = function() {
     var demo = new Demo(document.getElementById('viewport'));
-    var logger = new Legs.Log.NullLogger();
 
     /* ground */
     var ground = new Legs.Model.Ground(new THREE.Vector3(500, 500, 0.5));
@@ -38,30 +37,30 @@
     var controlParams = {
       orientationVT: {
         torqueLimit: 1000,
-        pdGains: [3000, -500]
+        pdGains: [1000, -300]
       },
       positionVF: {
-        pdGains: [0, 0]
+        pdGains: [0, -100]
       },
       joints: [
         {
           torqueLimit: 1000,
-          pdGains: [1500, 100],
-          fbGains: [0.06, 0.06]
+          pdGains: [1500, 200],
+          fbGains: [0.06, 0.10]
         },
         {
           torqueLimit: 1000,
-          pdGains: [1500, 100],
+          pdGains: [1500, 200],
           fbGains: [0, 0]
         },
         {
           torqueLimit: 1000,
-          pdGains: [1500, 100],
+          pdGains: [1500, 200],
           fbGains: [0, 0]
         },
         {
           torqueLimit: 1000,
-          pdGains: [800, 80],
+          pdGains: [200, 80],
           fbGains: [0, 0]
         }
       ]
@@ -105,9 +104,13 @@
 
       if(window.location.hash === '#heading')
       {
-        var input = document.querySelector("#heading input");
+        var heading = parseFloat(document.querySelector("#heading input[name=heading]").value);
+        var speed = parseFloat(document.querySelector("#heading input[name=speed]").value);
         for(var i = 0; i < legFrames.length; i++)
-          legFrames[i].heading = input.value;
+        {
+          legFrames[i].heading = heading;
+          legFrames[i].targetVel.set(0, speed, 0);
+        }
       }
 
       /* iterates over the contact manifolds to check if any leg is touching the ground */
@@ -132,7 +135,14 @@
               var leg = legFrame.legs[j];
               if(Ammo.compare(leg.segments[leg.segments.length - 1].body, legSegment))
               {
-                legFrame.gait.setContactForLeg(j, true);
+                var contactForce = 0;
+                for(var k = 0; k < contactManifold.getNumContacts(); k++)
+                {
+                  var manifoldPoint = contactManifold.getContactPoint(k);
+                  contactForce += manifoldPoint.get_m_appliedImpulse()/timeStep;
+                }
+                if(contactForce > 700)
+                  legFrame.gait.setContactForLeg(j, true);
                 break;
               }
             }
@@ -186,6 +196,7 @@
     <div id="heading">
       <p>
         <label>heading </label><input type="number" step="0.1" name="heading" value="0" />
+        <label>speed </label><input type="number" step="0.1" name="speed" value="0" />
       </p>
     </div>
   </div>

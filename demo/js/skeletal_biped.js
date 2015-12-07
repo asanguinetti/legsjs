@@ -13,7 +13,7 @@ var SkeletalBipedLeg = {
         children: [
           {
             model: Legs.Model.BallSocketJoint,
-            modelParams: [[-Math.PI, -0.1, -Math.PI/4], [0, 0.1, Math.PI/4]],
+            modelParams: [[-2*Math.PI/3, -0.1, -Math.PI/4], [0, 0.1, Math.PI/4]],
             snapPointParent: [0, 0, -1],
             snapPointChild: [0, 0, 0.7],
             child: {
