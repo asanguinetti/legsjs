@@ -11,12 +11,12 @@ var common = {};
 
 exports.setUp = function(callback)
 {
-  var scene = new THREE.Scene();
-  var collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
-  var dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
-  var overlappingPairCache = new Ammo.btDbvtBroadphase();
-  var solver = new Ammo.btSequentialImpulseConstraintSolver();
-  scene.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
+  var scene = this.scene = new THREE.Scene();
+  this.collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
+  this.dispatcher = new Ammo.btCollisionDispatcher(this.collisionConfiguration);
+  this.overlappingPairCache = new Ammo.btDbvtBroadphase();
+  this.solver = new Ammo.btSequentialImpulseConstraintSolver();
+  scene.world = new Ammo.btDiscreteDynamicsWorld(this.dispatcher, this.overlappingPairCache, this.solver, this.collisionConfiguration);
   scene.world.setGravity(new Ammo.btVector3(0,0,-20));
   scene.world.bodies = [];
 
@@ -44,6 +44,18 @@ exports.setUp = function(callback)
     pdGains: [300, 10],
     fbGains: [0.10, 0.10]
   }
+
+  callback();
+};
+
+
+exports.tearDown = function(callback)
+{
+  Ammo.destroy(this.scene.world);
+  Ammo.destroy(this.solver);
+  Ammo.destroy(this.dispatcher);
+  Ammo.destroy(this.collisionConfiguration);
+  Ammo.destroy(this.overlappingPairCache);
 
   callback();
 };
